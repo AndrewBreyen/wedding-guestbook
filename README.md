@@ -1,8 +1,8 @@
 # Matt & Hailey's Wedding Guestbook
 
 A kiosk-style digital guestbook. Guests type their name and an optional note,
-take their own photo, and it prints out automatically while being saved to
-the computer.
+take their own photo, and a captioned 2×3-inch print is printed automatically.
+The original photo and composed print image are saved to the computer.
 
 ## How it's built
 
@@ -65,8 +65,10 @@ printer — not great for a kiosk where guests are pressing the buttons.
 Chrome has a flag that skips this and prints straight to your default
 printer.
 
-1. Plug in and set your printer as the **default printer** in
-   **System Settings → Printers & Scanners**.
+1. Connect the Canon SELPHY CP1500 to the same Wi-Fi network as the Mac, add
+   it in **System Settings → Printers & Scanners**, and set it as the default
+   printer. Load the CP1500 card-size paper (54 × 86 mm / about 2.1 × 3.4 in)
+   and select that media size in the printer's saved print settings.
 2. Quit Chrome completely.
 3. Launch Chrome from the Terminal with the kiosk-printing flag, pointed
    straight at the app:
@@ -75,7 +77,9 @@ printer.
 open -a "Google Chrome" --args --kiosk-printing "http://localhost:5173"
 ```
 
-Now tapping "Confirm & Print" will print immediately with no dialog.
+Now tapping "Confirm & Print" prints the composed 2×3-inch image without a
+dialog. Do one test print first and confirm the CP1500 is using card-size
+media; the app's print image is 2×3 inches, while the physical sheet is larger.
 
 Optional: add `--kiosk` to the same command to make Chrome go fullscreen
 with no address bar or window chrome, so guests can't accidentally
@@ -102,7 +106,7 @@ mode afterward.)
 All your data is sitting in:
 
 - `server/data/entries.json` — every guest's name, note, and timestamp
-- `server/data/photos/` — every guest's photo, named to match
+- `server/data/photos/` — each original camera photo and its captioned 2×3 print image
 
 Back these up / copy them wherever you like (an external drive, cloud
 storage, etc.) — there's no automatic upload built in right now, so this is

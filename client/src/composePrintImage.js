@@ -1,13 +1,10 @@
-// Renders the guest's photo + name into a single flattened image, sized to
-// print at exactly 4x6in at 300dpi. This is what gets saved to disk and
-// printed — a real file, not just a CSS layout, so what's saved matches
-// exactly what came out of the printer.
+// Renders the guest's photo + name into a flattened 2x3in image at 300dpi.
 
 const DPI = 300;
-const WIDTH_IN = 4;
-const HEIGHT_IN = 6;
-const PADDING_IN = 0.28;
-const PHOTO_HEIGHT_IN = 4.6;
+const WIDTH_IN = 2;
+const HEIGHT_IN = 3;
+const PADDING_IN = 0.1;
+const PHOTO_HEIGHT_IN = 2.28;
 
 function inchesToPx(inches) {
   return Math.round(inches * DPI);
@@ -51,7 +48,7 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
-export async function composePolaroid({ photoBlob, name }) {
+export async function composePrintImage({ photoBlob, name }) {
   const canvas = document.createElement("canvas");
   canvas.width = inchesToPx(WIDTH_IN);
   canvas.height = inchesToPx(HEIGHT_IN);
@@ -68,7 +65,7 @@ export async function composePolaroid({ photoBlob, name }) {
   drawCover(ctx, photo, padding, padding, photoW, photoH);
 
   // Caption, centered in the remaining white strip at the bottom.
-  const fontPx = Math.round((40 / 96) * DPI); // 40 CSS px -> canvas px at 300dpi
+  const fontPx = Math.round((18 / 72) * DPI); // 18pt caption at 300dpi
   await document.fonts.load(`600 ${fontPx}px "Caveat"`);
   await document.fonts.ready;
 

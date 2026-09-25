@@ -4,12 +4,12 @@ export async function fetchEntries() {
   return res.json();
 }
 
-export async function saveEntry({ name, notes, photoBlob, polaroidBlob }) {
+export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
   const form = new FormData();
   form.append("name", name);
   form.append("notes", notes);
   form.append("photo", photoBlob, "photo.jpg");
-  form.append("polaroid", polaroidBlob, "polaroid.jpg");
+  form.append("printImage", printImageBlob, "print-image.jpg");
 
   const res = await fetch("/api/entries", { method: "POST", body: form });
   if (!res.ok) {

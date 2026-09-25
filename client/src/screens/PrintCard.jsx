@@ -1,13 +1,11 @@
-// Rendered off-screen at all times; only becomes visible via the @media print
-// rules in styles.css when window.print() is called. The polaroid image is
-// already fully composed (photo + name baked in) by composePolaroid.js, so
-// this just prints it full-bleed at its native 4x6in size.
+// Rendered off-screen until window.print() is called. The photo and caption
+// are already composed into a 2x3in image.
 export default function PrintCard({ entry }) {
   if (!entry) return null;
 
   return (
     <div className="print-only">
-      <img src={entry.polaroidUrl} alt="Guestbook polaroid" className="polaroid-print-img" />
+      <img src={entry.printImageUrl} alt="Guestbook photo" className="guest-print-img" />
     </div>
   );
 }

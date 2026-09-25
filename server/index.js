@@ -43,19 +43,18 @@ app.get("/api/entries", (req, res) => {
   res.json(entries);
 });
 
-// Save a new entry: name + notes (text), the raw photo the camera took, and
-// the fully composed 4x6in polaroid image (photo + name baked in) that was
-// sent to the printer. Both images are kept on disk.
+// Save a new entry: name + notes, the original camera photo, and the
+// composed 2x3in print image. Both image files are kept on disk.
 app.post(
   "/api/entries",
   upload.fields([
     { name: "photo", maxCount: 1 },
-    { name: "polaroid", maxCount: 1 },
+    { name: "printImage", maxCount: 1 },
   ]),
   (req, res) => {
     const { name, notes } = req.body;
     const photoFile = req.files?.photo?.[0];
-    const polaroidFile = req.files?.polaroid?.[0];
+    const printImageFile = req.files?.printImage?.[0];
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Name is required." });
@@ -63,22 +62,22 @@ app.post(
     if (!photoFile) {
       return res.status(400).json({ error: "Photo is required." });
     }
-    if (!polaroidFile) {
-      return res.status(400).json({ error: "Polaroid image is required." });
+    if (!printImageFile) {
+      return res.status(400).json({ error: "Print image is required." });
     }
 
     const id = crypto.randomUUID();
     const photoFilename = `${id}-photo.jpg`;
-    const polaroidFilename = `${id}-polaroid.jpg`;
+    const printImageFilename = `${id}-print.jpg`;
     fs.writeFileSync(path.join(PHOTOS_DIR, photoFilename), photoFile.buffer);
-    fs.writeFileSync(path.join(PHOTOS_DIR, polaroidFilename), polaroidFile.buffer);
+    fs.writeFileSync(path.join(PHOTOS_DIR, printImageFilename), printImageFile.buffer);
 
     const entry = {
       id,
       name: name.trim(),
       notes: (notes || "").trim(),
       photoFilename,
-      polaroidFilename,
+      printImageFilename,
       createdAt: new Date().toISOString(),
     };
 
