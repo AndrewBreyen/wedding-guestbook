@@ -14,6 +14,22 @@ The original photo and composed print image are saved to the computer.
 Nothing leaves this computer. This is intentional: venue wifi can be
 unreliable, and this way the guestbook works no matter what.
 
+## Public GitHub Pages demo
+
+The client can also be deployed as a static, memory-only demo with GitHub
+Pages. The workflow in `.github/workflows/deploy-pages.yml` builds the client
+with demo mode enabled and publishes it from `client/dist`.
+
+The demo never calls the Express server and does not use browser storage.
+Entries and photos exist only in the current browser tab and disappear when
+the page is refreshed or closed. Camera access requires browser permission,
+and printing uses the browser's normal print dialog; the local Chrome
+`--kiosk-printing` setup below is still required for silent kiosk printing.
+
+To enable the deployment, turn on GitHub Pages for the repository using
+**GitHub Actions** as the source. Pushes to `main` then rebuild and publish
+the demo at `https://<owner>.github.io/<repository>/`.
+
 ## 1. One-time setup
 
 You'll need [Node.js](https://nodejs.org/) installed (version 18 or newer).

@@ -31,7 +31,7 @@ export default function ViewAll({ onBack }) {
       <div className="viewall-grid">
         {entries.map((entry) => (
           <div className="guest-card" key={entry.id}>
-            <img src={`/photos/${entry.photoFilename}`} alt={entry.name} />
+            <img src={entry.photoUrl || `/photos/${entry.photoFilename}`} alt={entry.name} />
             <div className="guest-card-body">
               <p className="guest-card-name">{entry.name}</p>
               {entry.notes && <p className="guest-card-notes">{entry.notes}</p>}

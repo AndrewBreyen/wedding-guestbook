@@ -30,7 +30,6 @@ export default function App() {
     // Save the original capture and a composed 2x3in print image.
     const printImageBlob = await composePrintImage({ photoBlob: draft.photoBlob, name: draft.name });
     const saved = await saveEntry({ ...draft, printImageBlob });
-    const printImageUrl = `/photos/${saved.printImageFilename}`;
 
     // Make sure the saved print image is actually loaded before we print —
     // otherwise window.print() can fire while the <img> is still fetching.
@@ -38,10 +37,10 @@ export default function App() {
       const img = new Image();
       img.onload = resolve;
       img.onerror = resolve; // don't block printing forever if this fails
-      img.src = printImageUrl;
+      img.src = saved.printImageUrl || `/photos/${saved.printImageFilename}`;
     });
 
-    setPrintEntry({ printImageUrl });
+    setPrintEntry({ printImageUrl: saved.printImageUrl || `/photos/${saved.printImageFilename}` });
     setSavedName(saved.name);
 
     // With Chrome launched using --kiosk-printing this skips the print dialog.
