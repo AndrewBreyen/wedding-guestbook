@@ -119,6 +119,17 @@ body {
 
 /* ---------- Welcome screen ---------- */
 
+.demo-notice {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: var(--color-accent-dark);
+  font-size: 15px;
+  text-align: center;
+}
+
 .welcome-names {
   font-family: var(--font-display);
   font-weight: 600;

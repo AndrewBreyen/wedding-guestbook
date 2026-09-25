@@ -1,6 +1,9 @@
 export default function Welcome({ onStart, onViewAll }) {
+  const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
+
   return (
     <div className="screen">
+      {demoMode && <p className="demo-notice">Demo mode — no data is saved. Entries reset when you refresh.</p>}
       <p className="eyebrow">Welcome to</p>
       <h1 className="welcome-names">Matt &amp; Hailey's Wedding</h1>
       <hr className="rule" />
