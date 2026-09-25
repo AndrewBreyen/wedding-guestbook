@@ -1,0 +1,14 @@
+{
+  "name": "wedding-guestbook",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --prefix server start",
+    "dev:client": "npm --prefix client run dev",
+    "install:all": "npm --prefix server install && npm --prefix client install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
