@@ -1,4 +1,4 @@
-export default function Welcome({ onStart, onViewAll }) {
+export default function Welcome({ onStart, onViewAll, onDisposableCamera }) {
   const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
   return (
@@ -10,6 +10,9 @@ export default function Welcome({ onStart, onViewAll }) {
       <p className="welcome-sub">Sign our guestbook and leave us a photo &amp; a note</p>
       <button className="btn btn-primary" onClick={onStart}>
         Sign In With a Photo
+      </button>
+      <button className="btn btn-secondary disposable-link" onClick={onDisposableCamera}>
+        Take photos with the disposable camera
       </button>
       <button className="btn-text view-all-link" onClick={onViewAll}>
         View all guests

@@ -5,4 +5,7 @@ client/dist
 node_modules
 .aws-sam
 agent-toolkit-role.yaml
+.env
+.env.*
+!.env.example
 client/.env
