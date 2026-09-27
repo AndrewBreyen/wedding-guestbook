@@ -3,4 +3,6 @@ server/node_modules
 client/node_modules
 client/dist
 node_modules
+.aws-sam
+agent-toolkit-role.yaml
 client/.env

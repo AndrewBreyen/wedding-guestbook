@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: AWS backend for the wedding guestbook (GitHub Pages hosts the static client).
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Timeout: 20
+    MemorySize: 256
+
+Resources:
+  GuestbookApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
+        MaxAge: 600
+
+  EntriesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: ["*"]
+            AllowedMethods: [PUT, GET, HEAD]
+            AllowedHeaders: ["*"]
+            MaxAge: 3600
+
+  GuestbookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handler.handler
+      Architectures: [arm64]
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EntriesTable
+          BUCKET_NAME: !Ref PhotosBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EntriesTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+      Events:
+        Uploads:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuestbookApi
+            Path: /uploads
+            Method: POST
+        EntriesRead:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuestbookApi
+            Path: /entries
+            Method: GET
+        EntriesWrite:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuestbookApi
+            Path: /entries
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: Set this as the GitHub Actions variable VITE_API_URL.
+    Value: !Sub "https://${GuestbookApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
