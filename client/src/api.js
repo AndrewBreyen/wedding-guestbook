@@ -1,9 +1,11 @@
 import {
   collection,
-  addDoc,
+  doc,
+  getDocFromServer,
   getDocs,
   query,
   orderBy,
+  setDoc,
   Timestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -95,13 +97,26 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
     ]);
 
     const createdAt = new Date();
-    await addDoc(collection(db, "entries"), {
+    const entryRef = doc(db, "entries", id);
+    const entryData = {
       name: trimmedName,
       notes: (notes || "").trim(),
       photoUrl,
       printImageUrl,
       createdAt: Timestamp.fromDate(createdAt),
-    });
+    };
+
+    try {
+      await setDoc(entryRef, entryData);
+    } catch (writeError) {
+      if (writeError.code === "permission-denied") throw writeError;
+
+      // Firestore may have committed the write even when the client loses its
+      // acknowledgment. Check this deterministic document before reporting a
+      // failure, so a saved entry does not look like an unsuccessful save.
+      const savedSnapshot = await getDocFromServer(entryRef);
+      if (!savedSnapshot.exists()) throw writeError;
+    }
 
     return {
       id,
@@ -113,6 +128,9 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
     };
   } catch (err) {
     console.error(err);
-    throw new Error("Could not save entry. Check your connection and try again.");
+    const message = err.code === "permission-denied"
+      ? "Firestore denied this save. Check the Firestore security rules."
+      : "Could not save entry. Check your connection and try again.";
+    throw new Error(message, { cause: err });
   }
 }
