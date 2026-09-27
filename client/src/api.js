@@ -1,15 +1,3 @@
-import {
-  collection,
-  doc,
-  getDocFromServer,
-  getDocs,
-  query,
-  orderBy,
-  setDoc,
-  Timestamp,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
 import demoPortraitOne from "./assets/demo-portrait-one.png";
 import demoPortraitTwo from "./assets/demo-portrait-two.png";
 
@@ -34,6 +22,11 @@ const demoEntries = DEMO_MODE
       },
     ]
   : [];
+const API_URL = (import.meta.env.VITE_API_URL || "https://wmuwh7dlg1.execute-api.us-east-1.amazonaws.com").replace(/\/$/, "");
+
+function requireApiUrl() {
+  return API_URL;
+}
 
 function createDemoId() {
   return crypto.randomUUID();
@@ -41,21 +34,9 @@ function createDemoId() {
 
 export async function fetchEntries() {
   if (DEMO_MODE) return [...demoEntries];
-
-  const entriesQuery = query(collection(db, "entries"), orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(entriesQuery);
-
-  return snapshot.docs.map((docSnap) => {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      name: data.name,
-      notes: data.notes,
-      photoUrl: data.photoUrl,
-      printImageUrl: data.printImageUrl,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-    };
-  });
+  const response = await fetch(`${requireApiUrl()}/entries`);
+  if (!response.ok) throw new Error("Could not load entries.");
+  return response.json();
 }
 
 export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
@@ -78,59 +59,37 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
   if (!photoBlob) throw new Error("Photo is required.");
   if (!printImageBlob) throw new Error("Print image is required.");
 
-  const id = crypto.randomUUID();
-
   try {
-    // Upload both images to Storage first, then write the Firestore doc once
-    // we have their public download URLs.
-    const photoRef = ref(storage, `photos/${id}-photo.jpg`);
-    const printImageRef = ref(storage, `photos/${id}-print.jpg`);
+    const apiUrl = requireApiUrl();
+    const id = crypto.randomUUID();
+    const uploadResponse = await fetch(`${apiUrl}/uploads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (!uploadResponse.ok) throw new Error("Could not prepare image uploads.");
+    const { uploads } = await uploadResponse.json();
 
-    const [photoUpload, printImageUpload] = await Promise.all([
-      uploadBytes(photoRef, photoBlob, { contentType: "image/jpeg" }),
-      uploadBytes(printImageRef, printImageBlob, { contentType: "image/jpeg" }),
+    await Promise.all([
+      fetch(uploads.photo.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: photoBlob }).then(checkUpload),
+      fetch(uploads.print.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: printImageBlob }).then(checkUpload),
     ]);
 
-    const [photoUrl, printImageUrl] = await Promise.all([
-      getDownloadURL(photoUpload.ref),
-      getDownloadURL(printImageUpload.ref),
-    ]);
+    const response = await fetch(`${apiUrl}/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name: trimmedName, notes: (notes || "").trim() }),
+    });
+    if (!response.ok) throw new Error("Could not save the guest entry.");
+    return response.json();
 
-    const createdAt = new Date();
-    const entryRef = doc(db, "entries", id);
-    const entryData = {
-      name: trimmedName,
-      notes: (notes || "").trim(),
-      photoUrl,
-      printImageUrl,
-      createdAt: Timestamp.fromDate(createdAt),
-    };
-
-    try {
-      await setDoc(entryRef, entryData);
-    } catch (writeError) {
-      if (writeError.code === "permission-denied") throw writeError;
-
-      // Firestore may have committed the write even when the client loses its
-      // acknowledgment. Check this deterministic document before reporting a
-      // failure, so a saved entry does not look like an unsuccessful save.
-      const savedSnapshot = await getDocFromServer(entryRef);
-      if (!savedSnapshot.exists()) throw writeError;
-    }
-
-    return {
-      id,
-      name: trimmedName,
-      notes: (notes || "").trim(),
-      photoUrl,
-      printImageUrl,
-      createdAt: createdAt.toISOString(),
-    };
   } catch (err) {
     console.error(err);
-    const message = err.code === "permission-denied"
-      ? "Firestore denied this save. Check the Firestore security rules."
-      : "Could not save entry. Check your connection and try again.";
+    const message = err.message || "Could not save entry. Check your connection and try again.";
     throw new Error(message, { cause: err });
   }
+}
+
+function checkUpload(response) {
+  if (!response.ok) throw new Error("Could not upload an image to AWS S3.");
 }

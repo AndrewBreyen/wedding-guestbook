@@ -1,143 +1,105 @@
 # Matt & Hailey's Wedding Guestbook
 
-A kiosk-style digital guestbook. Guests type their name and an optional note,
-take their own photo, and a captioned 2×3-inch print is printed automatically.
-The original photo and composed print image are saved to the computer.
+A kiosk-style digital guestbook. Guests enter a name and optional note, take a
+photo, and print a captioned 2×3-inch card. The web client is a static React
+app hosted on GitHub Pages. The live backend uses AWS API Gateway, Lambda,
+DynamoDB, and a private S3 bucket. It also includes a single-event disposable
+camera that guests can open from a QR code or link without installing an app
+or creating an account.
 
-## How it's built
+## Architecture
 
-- **`client/`** — the React app guests actually see (Vite + React)
-- **`server/`** — a small local Express server that saves each entry
-  (name, note, photo) to files on this computer — no cloud account needed
-- Data lives in `server/data/entries.json` plus `server/data/photos/`
+- `client/`: React + Vite user interface.
+- `backend/src/handler.mjs`: AWS Lambda API for guestbook entries, signed photo
+  uploads, and disposable-camera rolls.
+- `template.yaml`: AWS SAM infrastructure definition.
+- `.github/workflows/deploy-pages.yml`: builds and publishes the client.
 
-Nothing leaves this computer. This is intentional: venue wifi can be
-unreliable, and this way the guestbook works no matter what.
+Photos upload directly from the browser to private S3 using short-lived
+pre-signed URLs. Entry metadata is stored in DynamoDB. The API returns
+time-limited photo URLs for the gallery and print view. The API is public so
+guests can submit entries; do not put private information in the guestbook.
 
-## Public GitHub Pages demo
+## Disposable camera
 
-The client can also be deployed as a static, memory-only demo with GitHub
-Pages. The workflow in `.github/workflows/deploy-pages.yml` builds the client
-with demo mode enabled and publishes it from `client/dist`.
+Open `?camera=1` on the Pages URL or scan the QR code from the app. Each guest
+can take up to five photos from one browser, without an account. The app asks
+for a name and optional email; the name appears with photos, while email is
+visible only to hosts. The camera limit is per browser and can be reset by
+clearing browser data or switching devices; it is not a verified per-person
+limit.
 
-The demo never calls the Express server and does not use browser storage.
-Entries and photos exist only in the current browser tab and disappear when
-the page is refreshed or closed. Camera access requires browser permission,
-and printing uses the browser's normal print dialog; the local Chrome
-`--kiosk-printing` setup below is still required for silent kiosk printing.
+Guests can take photos directly with the live camera or choose existing photos
+from their device. **My photos** shows the guest's own uploads and lets them
+delete a photo, which returns that shot to their roll. Photos stay hidden from
+the shared event gallery until the host reviews the roll and chooses **Reveal
+the roll** at `?camera-admin=1`. Hosts can also delete photos there. S3 remains
+private; the browser receives short-lived upload and viewing links from the API.
 
-To enable the deployment, turn on GitHub Pages for the repository using
-**GitHub Actions** as the source. Pushes to `main` then rebuild and publish
-the demo at `https://<owner>.github.io/<repository>/`.
-
-## 1. One-time setup
-
-You'll need [Node.js](https://nodejs.org/) installed (version 18 or newer).
-The easiest way on a Mac:
-
-```bash
-# If you have Homebrew:
-brew install node
-
-# Otherwise, download the installer from nodejs.org and run it.
-```
-
-Check it worked:
+To enable host controls, put the review code in the root `.env` file (it is
+git-ignored), then deploy only its SHA-256 hash as the `CameraAdminCodeHash`
+SAM parameter. The Lambda needs the hash to check codes; no Secrets Manager
+secret is used. From the repository root, run:
 
 ```bash
-node -v   # should print v18.x or higher
+set -a
+source .env
+set +a
+CAMERA_ADMIN_CODE_HASH="$(printf %s "$CAMERA_ADMIN_CODE" | shasum -a 256 | cut -d ' ' -f 1)"
+sam deploy --parameter-overrides "CameraAdminCodeHash=$CAMERA_ADMIN_CODE_HASH" "CameraPhotosPerGuest=5" --profile GuestbookIdentity --region us-east-1
+unset CAMERA_ADMIN_CODE CAMERA_ADMIN_CODE_HASH
 ```
 
-Then, from the `wedding-guestbook` folder, install everything:
+Do not commit `.env` or put the raw code in GitHub Actions. The public guest
+flow does not require this code.
+
+## Deploy the AWS backend
+
+Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+and [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html),
+then configure credentials for an AWS account and region. From the repository
+root:
 
 ```bash
-cd wedding-guestbook
-npm run install:all
-npm install
+sam build
+sam deploy --guided
 ```
 
-## 2. Run it
+The guided deployment creates a CloudFormation stack containing the API,
+Lambda, DynamoDB tables, and private S3 bucket. Keep the stack name and region.
+The deployed stack's `ApiUrl` is
+`https://wmuwh7dlg1.execute-api.us-east-1.amazonaws.com`. For future deploys,
+copy the `ApiUrl` output from CloudFormation.
 
-From the `wedding-guestbook` folder:
+## Publish on GitHub Pages
+
+1. Under **Settings → Pages**, set the source to **GitHub Actions**.
+2. Push to `main` or run **Deploy client to GitHub Pages** from the Actions tab.
+
+The client defaults to the deployed API. Set `VITE_API_URL` only when using a
+different backend. For a repository named
+`owner/repository`, the Pages URL is `https://owner.github.io/repository/`.
+
+## Run locally
 
 ```bash
-npm run dev
+cd client
+npm ci
+VITE_API_URL=https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com npm run dev
 ```
 
-This starts both the server (on port 4000) and the client (on port 5173) at
-once. Leave this terminal window open while the guestbook is running.
+Open the local URL shown by Vite. Camera access requires browser permission.
+For silent printing, launch Chrome with `--kiosk-printing`; otherwise the
+browser displays its normal print dialog.
 
-Open **http://localhost:5173** in Chrome.
+## Operational notes
 
-The first time you tap "Sign In With a Photo," the browser will ask for
-camera permission — click **Allow**. (If you don't see the prompt, check
-**System Settings → Privacy & Security → Camera** and make sure your
-browser is allowed.)
-
-## 3. Set up auto-printing (recommended)
-
-By default, browsers show a print dialog every time and ask you to pick a
-printer — not great for a kiosk where guests are pressing the buttons.
-Chrome has a flag that skips this and prints straight to your default
-printer.
-
-1. Connect the Canon SELPHY CP1500 to the same Wi-Fi network as the Mac, add
-   it in **System Settings → Printers & Scanners**, and set it as the default
-   printer. Load the CP1500 card-size paper (54 × 86 mm / about 2.1 × 3.4 in)
-   and select that media size in the printer's saved print settings.
-2. Quit Chrome completely.
-3. Launch Chrome from the Terminal with the kiosk-printing flag, pointed
-   straight at the app:
-
-```bash
-open -a "Google Chrome" --args --kiosk-printing "http://localhost:5173"
-```
-
-Now tapping "Confirm & Print" prints the composed 2×3-inch image without a
-dialog. Do one test print first and confirm the CP1500 is using card-size
-media; the app's print image is 2×3 inches, while the physical sheet is larger.
-
-Optional: add `--kiosk` to the same command to make Chrome go fullscreen
-with no address bar or window chrome, so guests can't accidentally
-navigate away:
-
-```bash
-open -a "Google Chrome" --args --kiosk --kiosk-printing "http://localhost:5173"
-```
-
-(Press `Cmd+Q` — or `Cmd+Option+Esc` and force-quit — to get out of kiosk
-mode afterward.)
-
-## 4. During the wedding
-
-- Leave the Terminal window (running `npm run dev`) open the whole time —
-  closing it stops the server and the app will stop working.
-- The small **"View all guests"** link on the home screen shows everyone
-  who has signed in so far, with their photo and note.
-- If the app looks frozen or errors out, refresh the page (`Cmd+R`) — no
-  data is lost, since every entry is saved the moment it's confirmed.
-
-## 5. After the wedding
-
-All your data is sitting in:
-
-- `server/data/entries.json` — every guest's name, note, and timestamp
-- `server/data/photos/` — each original camera photo and its captioned 2×3 print image
-
-Back these up / copy them wherever you like (an external drive, cloud
-storage, etc.) — there's no automatic upload built in right now, so this is
-a manual step. If down the road you want this synced somewhere
-automatically (GitHub, cloud storage, etc.), that's a straightforward
-add-on to the server.
-
-## Troubleshooting
-
-- **"Couldn't access the camera"** — another app (Zoom, Photo Booth, etc.)
-  might be using the camera. Close it and refresh.
-- **Nothing prints** — make sure a printer is set as default in System
-  Settings, and that you launched Chrome with `--kiosk-printing` as shown
-  above. Without that flag, you'll get a normal print dialog instead (which
-  still works, just requires a click).
-- **Port already in use** — if `npm run dev` complains a port is taken,
-  another copy of the app may already be running; check for a leftover
-  Terminal window/tab.
+- The API permits anonymous uploads and reads to support the public wedding
+  guestbook and disposable camera. Guests can bypass the per-browser photo limit
+  by resetting their browser or using another device. Consider deleting the AWS
+  stack after the event if the service is no longer needed.
+- AWS charges are usage based. DynamoDB is on-demand and the Lambda/API use
+  pay-per-request billing; S3 storage and transfer charges may apply.
+- `VITE_API_URL` is a public API endpoint, not a credential. AWS credentials
+  must never be placed in the client or GitHub Pages build variables.
+- The client also supports a memory-only demo build with `VITE_DEMO_MODE=true`.

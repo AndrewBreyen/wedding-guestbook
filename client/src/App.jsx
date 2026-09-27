@@ -5,12 +5,22 @@ import Confirm from "./screens/Confirm.jsx";
 import Thanks from "./screens/Thanks.jsx";
 import ViewAll from "./screens/ViewAll.jsx";
 import PrintCard from "./screens/PrintCard.jsx";
+import DisposableCamera from "./screens/DisposableCamera.jsx";
+import CameraAdmin from "./screens/CameraAdmin.jsx";
 import { saveEntry } from "./api";
 import { composePrintImage } from "./composePrintImage";
 
 const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null };
 
 export default function App() {
+  const query = new URLSearchParams(window.location.search);
+  const returnToGuestbook = () => { window.location.href = window.location.pathname; };
+  if (query.get("camera-admin") === "1") return <CameraAdmin onBack={returnToGuestbook} />;
+  if (query.get("camera") === "1") return <DisposableCamera onBack={returnToGuestbook} />;
+  return <GuestbookApp />;
+}
+
+function GuestbookApp() {
   const [screen, setScreen] = useState("welcome");
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [printEntry, setPrintEntry] = useState(null);
@@ -53,7 +63,11 @@ export default function App() {
   return (
     <div className="app">
       {screen === "welcome" && (
-        <Welcome onStart={() => setScreen("capture")} onViewAll={() => setScreen("viewAll")} />
+        <Welcome onStart={() => setScreen("capture")} onViewAll={() => setScreen("viewAll")} onDisposableCamera={() => {
+          const url = new URL(window.location.href);
+          url.search = "?camera=1";
+          window.location.assign(url);
+        }} />
       )}
 
       {screen === "capture" && (
