@@ -263,6 +263,17 @@ body {
   cursor: not-allowed;
 }
 
+.capture-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.capture-footer .btn-text:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* ---------- Confirm screen ---------- */
 
 .confirm-photo {
@@ -413,20 +424,22 @@ body {
   display: none;
 }
 
-@page {
-  size: 2in 3in;
-  margin: 0;
-}
-
 @media print {
   html,
-  body {
-    width: 2in;
-    height: 3in;
+  body,
+  #root,
+  .app {
+    width: var(--print-width);
+    height: var(--print-height);
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
   }
 
-  body * {
-    visibility: hidden;
+  .app > :not(.print-only) {
+    display: none !important;
   }
 
   .print-only,
@@ -436,17 +449,18 @@ body {
 
   .print-only {
     display: block;
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
-    width: 2in;
-    height: 3in;
+    width: var(--print-width);
+    height: var(--print-height);
+    background: #fff;
   }
 
   .guest-print-img {
-    width: 2in;
-    height: 3in;
-    object-fit: cover;
+    width: var(--print-width);
+    height: var(--print-artwork-height);
+    object-fit: fill;
     display: block;
   }
 }

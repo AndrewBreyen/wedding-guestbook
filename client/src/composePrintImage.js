@@ -1,10 +1,10 @@
-// Renders the guest's photo + name into a flattened 2x3in image at 300dpi.
+// Renders the guest's photo + name for the configured Brother label width.
+
+import { PRINT_ARTWORK_HEIGHT_IN, PRINT_IMAGE_HEIGHT_IN, PRINT_PHOTO_HEIGHT_IN, PRINT_SCALE, PRINT_WIDTH_MM } from "./printConfig";
 
 const DPI = 300;
-const WIDTH_IN = 2;
-const HEIGHT_IN = 3;
-const PADDING_IN = 0.1;
-const PHOTO_HEIGHT_IN = 2.28;
+const MM_PER_IN = 25.4;
+const WIDTH_IN = PRINT_WIDTH_MM / MM_PER_IN;
 
 function inchesToPx(inches) {
   return Math.round(inches * DPI);
@@ -51,7 +51,7 @@ function drawCover(ctx, img, x, y, w, h) {
 export async function composePrintImage({ photoBlob, name }) {
   const canvas = document.createElement("canvas");
   canvas.width = inchesToPx(WIDTH_IN);
-  canvas.height = inchesToPx(HEIGHT_IN);
+  canvas.height = inchesToPx(PRINT_IMAGE_HEIGHT_IN);
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#ffffff";
@@ -59,13 +59,11 @@ export async function composePrintImage({ photoBlob, name }) {
 
   const photo = await loadImageFromBlob(photoBlob);
 
-  const padding = inchesToPx(PADDING_IN);
-  const photoW = canvas.width - padding * 2;
-  const photoH = inchesToPx(PHOTO_HEIGHT_IN);
-  drawCover(ctx, photo, padding, padding, photoW, photoH);
+  const photoH = inchesToPx(PRINT_PHOTO_HEIGHT_IN);
+  drawCover(ctx, photo, 0, 0, canvas.width, photoH);
 
   // Caption, centered in the remaining white strip at the bottom.
-  const fontPx = Math.round((18 / 72) * DPI); // 18pt caption at 300dpi
+  const fontPx = Math.round((18 / 72) * DPI * PRINT_SCALE);
   await document.fonts.load(`600 ${fontPx}px "Caveat"`);
   await document.fonts.ready;
 
@@ -73,9 +71,12 @@ export async function composePrintImage({ photoBlob, name }) {
   ctx.font = `600 ${fontPx}px "Caveat", cursive`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const captionTop = padding + photoH;
-  const captionCenterY = captionTop + (canvas.height - captionTop) / 2;
+  const captionTop = photoH;
+  const captionCenterY = captionTop + (inchesToPx(PRINT_ARTWORK_HEIGHT_IN) - captionTop) / 2;
   ctx.fillText(name, canvas.width / 2, captionCenterY);
+
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, canvas.height - 2, canvas.width, 2);
 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
 }

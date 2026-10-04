@@ -9,6 +9,9 @@ import DisposableCamera from "./screens/DisposableCamera.jsx";
 import CameraAdmin from "./screens/CameraAdmin.jsx";
 import { saveEntry } from "./api";
 import { composePrintImage } from "./composePrintImage";
+import { composeCalibrationImage } from "./composeCalibrationImage";
+import { PRINT_CARD_HEIGHT_IN, PRINT_HEIGHT_IN, PRINT_WIDTH_MM } from "./printConfig";
+import demoPortrait from "./assets/demo-portrait-one.png";
 
 const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null };
 
@@ -37,20 +40,24 @@ function GuestbookApp() {
   }
 
   async function handleConfirm() {
-    // Save the original capture and a composed 2x3in print image.
+    // Save the original capture and a composed image sized for the Brother label.
     const printImageBlob = await composePrintImage({ photoBlob: draft.photoBlob, name: draft.name });
     const saved = await saveEntry({ ...draft, printImageBlob });
 
-    // Make sure the saved print image is actually loaded before we print —
-    // otherwise window.print() can fire while the <img> is still fetching.
-    await new Promise((resolve) => {
+    // Make sure the saved print image loaded before opening the print pipeline.
+    await new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = resolve;
-      img.onerror = resolve; // don't block printing forever if this fails
+      img.onerror = () => reject(new Error("Unable to load the print image."));
       img.src = saved.printImageUrl || `/photos/${saved.printImageFilename}`;
     });
 
-    setPrintEntry({ printImageUrl: saved.printImageUrl || `/photos/${saved.printImageFilename}` });
+    setPrintEntry({
+      printImageUrl: saved.printImageUrl || `/photos/${saved.printImageFilename}`,
+      widthMm: PRINT_WIDTH_MM,
+      heightIn: PRINT_CARD_HEIGHT_IN,
+      artworkHeightIn: PRINT_CARD_HEIGHT_IN,
+    });
     setSavedName(saved.name);
 
     // With Chrome launched using --kiosk-printing this skips the print dialog.
@@ -58,6 +65,47 @@ function GuestbookApp() {
       window.print();
       setScreen("thanks");
     });
+  }
+
+  async function handleDemoPrint() {
+    const photoBlob = await fetch(demoPortrait).then((response) => response.blob());
+    const printImageBlob = await composePrintImage({ photoBlob, name: "Test print" });
+    await printTestImage(printImageBlob, PRINT_CARD_HEIGHT_IN);
+  }
+
+  async function handleCalibrationPrint() {
+    const printImageBlob = await composeCalibrationImage();
+    if (!printImageBlob) throw new Error("Unable to create the calibration image.");
+    await printTestImage(printImageBlob);
+  }
+
+  async function printTestImage(printImageBlob, heightIn = PRINT_HEIGHT_IN) {
+    const printImageUrl = URL.createObjectURL(printImageBlob);
+
+    setPrintEntry({
+      printImageUrl,
+      widthMm: PRINT_WIDTH_MM,
+      heightIn,
+      artworkHeightIn: heightIn,
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = () => reject(new Error("Unable to load the demo print image."));
+        img.src = printImageUrl;
+      });
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          window.print();
+          resolve();
+        });
+      });
+    } finally {
+      URL.revokeObjectURL(printImageUrl);
+      setPrintEntry(null);
+    }
   }
 
   return (
@@ -71,7 +119,13 @@ function GuestbookApp() {
       )}
 
       {screen === "capture" && (
-        <Capture draft={draft} onTakePhoto={handleTakePhoto} onCancel={goHome} />
+        <Capture
+          draft={draft}
+          onTakePhoto={handleTakePhoto}
+          onCancel={goHome}
+          onDemoPrint={handleDemoPrint}
+          onCalibrationPrint={handleCalibrationPrint}
+        />
       )}
 
       {screen === "confirm" && (

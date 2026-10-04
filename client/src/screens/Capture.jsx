@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function Capture({ draft, onTakePhoto, onCancel }) {
+export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onCalibrationPrint }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const [name, setName] = useState(draft.name || "");
   const [notes, setNotes] = useState(draft.notes || "");
   const [cameraError, setCameraError] = useState(null);
+  const [demoPrintError, setDemoPrintError] = useState(null);
+  const [printingDemo, setPrintingDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [count, setCount] = useState(null);
   const countTimerRef = useRef(null);
@@ -76,6 +78,18 @@ export default function Capture({ draft, onTakePhoto, onCancel }) {
     }, 1000);
   }
 
+  async function printTest(onPrint) {
+    setPrintingDemo(true);
+    setDemoPrintError(null);
+    try {
+      await onPrint();
+    } catch (err) {
+      setDemoPrintError(err.message || "Could not print the demo card.");
+    } finally {
+      setPrintingDemo(false);
+    }
+  }
+
   useEffect(() => {
     return () => clearInterval(countTimerRef.current);
   }, []);
@@ -123,9 +137,18 @@ export default function Capture({ draft, onTakePhoto, onCancel }) {
         <p className="form-error">Enter your name to take a photo</p>
       )}
 
-      <button className="btn-text" onClick={onCancel}>
-        Back to home
-      </button>
+      <div className="capture-footer">
+        <button className="btn-text" onClick={() => printTest(onDemoPrint)} disabled={printingDemo}>
+          {printingDemo ? "Preparing print..." : "Demo print"}
+        </button>
+        <button className="btn-text" onClick={() => printTest(onCalibrationPrint)} disabled={printingDemo}>
+          Calibration print
+        </button>
+        <button className="btn-text" onClick={onCancel}>
+          Back to home
+        </button>
+      </div>
+      {demoPrintError && <p className="form-error" role="alert">{demoPrintError}</p>}
     </div>
   );
 }
