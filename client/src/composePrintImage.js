@@ -48,6 +48,29 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
+// Greedy wrap: fill each line up to maxWidth, breaking at the last space on the
+// line, or mid-word if there is no space.
+function wrapName(ctx, name, maxWidth) {
+  const lines = [];
+  let line = "";
+  for (const ch of name) {
+    if (line && ctx.measureText(line + ch).width > maxWidth) {
+      const space = line.lastIndexOf(" ");
+      if (space > 0) {
+        lines.push(line.slice(0, space));
+        line = line.slice(space + 1) + ch;
+      } else {
+        lines.push(line);
+        line = ch;
+      }
+    } else {
+      line += ch;
+    }
+  }
+  lines.push(line);
+  return lines.map((l) => l.trim()).filter(Boolean);
+}
+
 export async function composePrintImage({ photoBlob, name }) {
   const canvas = document.createElement("canvas");
   canvas.width = inchesToPx(WIDTH_IN);
@@ -59,24 +82,27 @@ export async function composePrintImage({ photoBlob, name }) {
 
   const photo = await loadImageFromBlob(photoBlob);
 
-  const photoH = inchesToPx(PRINT_PHOTO_HEIGHT_IN);
-  drawCover(ctx, photo, 0, 0, canvas.width, photoH);
-
-  // Caption, centered in the remaining white strip at the bottom.
   const fontPx = Math.round((18 / 72) * DPI * PRINT_SCALE);
   await document.fonts.load(`600 ${fontPx}px "Caveat"`);
   await document.fonts.ready;
-
-  ctx.fillStyle = "#2b2620";
   ctx.font = `600 ${fontPx}px "Caveat", cursive`;
+
+  // Names up to this width stay on one line; longer ones wrap onto more lines.
+  const maxWidth = ctx.measureText("ReallyLongNameWhoaT").width;
+  const lines = wrapName(ctx, name, maxWidth);
+
+  // Each extra line takes its height from the photo so the label length stays the same.
+  const photoH = inchesToPx(PRINT_PHOTO_HEIGHT_IN) - (lines.length - 1) * fontPx;
+  drawCover(ctx, photo, 0, 0, canvas.width, photoH);
+
+  // Caption, centered in the remaining white strip at the bottom.
+  ctx.fillStyle = "#2b2620";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const captionTop = photoH;
-  const captionCenterY = captionTop + (inchesToPx(PRINT_ARTWORK_HEIGHT_IN) - captionTop) / 2;
-  ctx.fillText(name, canvas.width / 2, captionCenterY);
-
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, canvas.height - 2, canvas.width, 2);
+  const captionCenterY = photoH + (inchesToPx(PRINT_ARTWORK_HEIGHT_IN) - photoH) / 2;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, canvas.width / 2, captionCenterY + (i - (lines.length - 1) / 2) * fontPx);
+  });
 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
 }

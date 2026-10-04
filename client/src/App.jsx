@@ -10,6 +10,7 @@ import CameraAdmin from "./screens/CameraAdmin.jsx";
 import { saveEntry } from "./api";
 import { composePrintImage } from "./composePrintImage";
 import { composeCalibrationImage } from "./composeCalibrationImage";
+import { tryDirectPrint } from "./directPrint";
 import { PRINT_CARD_HEIGHT_IN, PRINT_HEIGHT_IN, PRINT_WIDTH_MM } from "./printConfig";
 import demoPortrait from "./assets/demo-portrait-one.png";
 
