@@ -1,11 +1,20 @@
-// Rendered off-screen until window.print() is called. The photo and caption
-// are already composed into a 2x3in image.
+// Rendered off-screen until window.print() is called.
 export default function PrintCard({ entry }) {
   if (!entry) return null;
 
   return (
-    <div className="print-only">
-      <img src={entry.printImageUrl} alt="Guestbook photo" className="guest-print-img" />
-    </div>
+    <>
+      <style>{`
+        :root {
+          --print-width: ${entry.widthMm}mm;
+          --print-height: ${entry.heightIn}in;
+          --print-artwork-height: ${entry.artworkHeightIn}in;
+        }
+        @page { size: ${entry.widthMm}mm ${entry.heightIn}in; margin: 0; }
+      `}</style>
+      <div className="print-only">
+        <img src={entry.printImageUrl} alt="Guestbook photo" className="guest-print-img" />
+      </div>
+    </>
   );
 }

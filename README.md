@@ -1,7 +1,7 @@
 # Matt & Hailey's Wedding Guestbook
 
 A kiosk-style digital guestbook. Guests enter a name and optional note, take a
-photo, and print a captioned 2×3-inch card. The web client is a static React
+photo, and print a captioned photo card. The web client is a static React
 app hosted on GitHub Pages. The live backend uses AWS API Gateway, Lambda,
 DynamoDB, and a private S3 bucket. It also includes a single-event disposable
 camera that guests can open from a QR code or link without installing an app
@@ -89,8 +89,33 @@ VITE_API_URL=https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com npm run d
 ```
 
 Open the local URL shown by Vite. Camera access requires browser permission.
-For silent printing, launch Chrome with `--kiosk-printing`; otherwise the
-browser displays its normal print dialog.
+Install the Brother VC-500W printer software if macOS does not add the printer
+automatically, connect it by USB, and set it as the macOS default printer.
+Choose the matching roll width in the printer setup: 50 mm for 2-inch labels or
+25 mm for 1-inch test labels.
+
+The default is `25` for a 25 mm wide calibration page 1.33 inches long; guest
+photo cards are 1.38 inches long to add a small blank tail. Set
+`VITE_PRINT_WIDTH_MM=50` for a 50 mm wide card about 2.53 inches long. The
+browser sends a page with that specific size; the printer does not auto-cut
+when printing from the computer.
+For example:
+
+```bash
+VITE_PRINT_WIDTH_MM=25 npm run dev
+```
+
+To start the guestbook and Chrome in kiosk-printing mode, run this from the
+project root:
+
+```bash
+./launch.sh
+```
+
+The launcher defaults to 25 mm labels. Use `VITE_PRINT_WIDTH_MM=50 ./launch.sh`
+for 2-inch stock. After a guest confirms their entry, it prints automatically to
+the macOS default printer. Confirm the printer's selected roll size matches the
+launcher setting. Press Ctrl-C in the launcher terminal to stop the local server.
 
 ## Operational notes
 
