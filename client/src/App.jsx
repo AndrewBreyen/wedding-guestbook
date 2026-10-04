@@ -44,6 +44,13 @@ function GuestbookApp() {
     const printImageBlob = await composePrintImage({ photoBlob: draft.photoBlob, name: draft.name });
     const saved = await saveEntry({ ...draft, printImageBlob });
 
+    // Preferred path: send straight to the printer with auto cut (needs PRINTER_HOST).
+    if (await tryDirectPrint(printImageBlob)) {
+      setSavedName(saved.name);
+      setScreen("thanks");
+      return;
+    }
+
     // Make sure the saved print image loaded before opening the print pipeline.
     await new Promise((resolve, reject) => {
       const img = new Image();
@@ -80,6 +87,8 @@ function GuestbookApp() {
   }
 
   async function printTestImage(printImageBlob, heightIn = PRINT_HEIGHT_IN) {
+    if (await tryDirectPrint(printImageBlob)) return;
+
     const printImageUrl = URL.createObjectURL(printImageBlob);
 
     setPrintEntry({

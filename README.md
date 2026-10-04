@@ -128,3 +128,22 @@ launcher setting. Press Ctrl-C in the launcher terminal to stop the local server
 - `VITE_API_URL` is a public API endpoint, not a credential. AWS credentials
   must never be placed in the client or GitHub Pages build variables.
 - The client also supports a memory-only demo build with `VITE_DEMO_MODE=true`.
+
+## Direct printing with auto cut (Brother VC-500W)
+
+The macOS print driver can't turn on the VC-500W's auto cut. Setting
+`PRINTER_HOST` makes the dev server send the job straight to the printer over
+the network (TCP 9100) with `<cutmode>full</cutmode>`, using the protocol from
+[vc-500w_autocut](https://github.com/corentin-soriano/vc-500w_autocut). If the
+direct job fails, the app falls back to the normal `window.print()` path.
+
+Requirements: the printer must be reachable by IP from the Mac (Wi-Fi or
+Wireless Direct). USB-only will not work for this path.
+
+```bash
+PRINTER_HOST=192.168.x.x ./launch.sh
+```
+
+Optional env vars: `PRINTER_PORT` (default 9100), `PRINTER_DRY_RUN=1` (log the
+job without contacting the printer), `VITE_DIRECT_PRINT_DPI` (default 313,
+resample density; adjust if prints come out scaled wrong).

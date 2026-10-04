@@ -23,6 +23,14 @@ if [[ "$VITE_PRINT_WIDTH_MM" != "25" && "$VITE_PRINT_WIDTH_MM" != "50" ]]; then
 fi
 export VITE_PRINT_WIDTH_MM
 
+# Optional: set PRINTER_HOST to the VC-500W's IP to print directly with auto cut
+# (bypasses the macOS print driver; falls back to it if the direct job fails).
+if [[ -n "${PRINTER_HOST:-}" ]]; then
+  export PRINTER_HOST
+  export VITE_DIRECT_PRINT=1
+  echo "Direct printing with auto cut enabled -> $PRINTER_HOST"
+fi
+
 cd "$CLIENT_DIR"
 "$VITE_BIN" --host 127.0.0.1 --port 5173 --strictPort &
 SERVER_PID=$!
