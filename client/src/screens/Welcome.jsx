@@ -11,9 +11,11 @@ export default function Welcome({ onStart, onViewAll, onDisposableCamera }) {
       <button className="btn btn-primary" onClick={onStart}>
         Sign In With a Photo
       </button>
-      <button className="btn btn-secondary disposable-link" onClick={onDisposableCamera}>
-        Take photos with the disposable camera
-      </button>
+      {onDisposableCamera && (
+        <button className="btn btn-secondary disposable-link" onClick={onDisposableCamera}>
+          Take photos with the disposable camera
+        </button>
+      )}
       <button className="btn-text view-all-link" onClick={onViewAll}>
         View all guests
       </button>

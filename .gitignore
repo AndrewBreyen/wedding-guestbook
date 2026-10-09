@@ -9,3 +9,4 @@ agent-toolkit-role.yaml
 .env.*
 !.env.example
 client/.env
+/client/.local-certs/

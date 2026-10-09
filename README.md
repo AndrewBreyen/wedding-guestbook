@@ -89,16 +89,15 @@ VITE_API_URL=https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com npm run d
 ```
 
 Open the local URL shown by Vite. Camera access requires browser permission.
-Install the Brother VC-500W printer software if macOS does not add the printer
-automatically, connect it by USB, and set it as the macOS default printer.
-Choose the matching roll width in the printer setup: 50 mm for 2-inch labels or
-25 mm for 1-inch test labels.
+For automatic network printing, the printer must be reachable over the network
+by the Mac running the print bridge. Choose the matching roll width in the
+printer setup: 50 mm for 2-inch labels or 25 mm for 1-inch test labels.
 
 The default is `25` for a 25 mm wide calibration page 1.33 inches long; guest
 photo cards are 1.38 inches long to add a small blank tail. Set
 `VITE_PRINT_WIDTH_MM=50` for a 50 mm wide card about 2.53 inches long. The
-browser sends a page with that specific size; the printer does not auto-cut
-when printing from the computer.
+print bridge scales the image to the selected roll width and sends it directly
+to the printer with auto-cut enabled.
 For example:
 
 ```bash
@@ -111,20 +110,50 @@ To start the guestbook server, run this from the project root:
 ./launch.sh
 ```
 
-Pass `-k` to also open Chrome in kiosk-printing mode:
+The launcher serves the app over HTTPS on the local network, allowing iPhones
+to use the live camera preview. On first run it creates and trusts a local
+certificate authority on the Mac. To connect an iPhone, install the CA
+certificate printed by the launcher/setup script:
+
+1. Install `mkcert` on the Mac (`brew install mkcert`).
+2. Run `./setup-lan-https.sh` from the project root. It prints the path to
+   `rootCA.cer`; transfer that certificate to the iPhone using AirDrop or
+   another private method. **Never transfer `rootCA-key.pem`.**
+3. On the iPhone, open the certificate and install its configuration profile
+   in Settings. Then go to **Settings → General → About → Certificate Trust
+   Settings** and enable full trust for the local certificate.
+4. Run `./launch.sh`. Open the printed `https://<Mac-LAN-IP>:5173` address in
+   Safari on the iPhone and allow camera access.
+5. To launch like an app, tap Safari's **Share → Add to Home Screen**, then open
+   the new home-screen icon. This uses the Apple Touch Icon and hides Safari's
+   browser controls. The iOS status bar remains visible over the app.
+
+The certificate is regenerated when `./launch.sh` starts, so a changed Mac
+LAN IP is covered automatically. If the iPhone shows a certificate warning,
+reinstall/trust the CA certificate before using the camera. Keep the Mac and
+guest devices on the same Wi-Fi; check the Mac firewall and Wi-Fi client
+isolation if the address cannot be reached. Entries/photos still use the
+configured AWS API, and direct print jobs are sent by the Mac to the printer
+configured by `PRINTER_HOST`. GitHub Pages supports the live camera, but does
+not currently connect to the Mac's private print bridge; use the LAN-hosted app
+URL for automatic network printing.
+
+Pass `-k` to also open Chrome in kiosk mode:
 
 ```bash
 ./launch.sh -k
 ```
 
-Pass `-t` to simulate print jobs without sending them to the network printer or
-macOS. A small notice shows which print route would have been used. Combine it
-with `-k` to run the app in kiosk mode, for example `./launch.sh -k -t`.
+Pass `-t` to enable test mode. A persistent banner warns that nothing will be
+saved or printed; guest entries and print jobs are simulated, and disposable
+camera/admin routes are disabled. Combine it with `-k` to run the app in kiosk
+mode, for example `./launch.sh -k -t`.
 
 The launcher defaults to 25 mm labels. Use `VITE_PRINT_WIDTH_MM=50 ./launch.sh`
-for 2-inch stock. After a guest confirms their entry, it prints automatically to
-the macOS default printer. Confirm the printer's selected roll size matches the
-launcher setting. Press Ctrl-C in the launcher terminal to stop the local server.
+for 2-inch stock. After a guest confirms their entry, it sends the print job
+directly over the network to `PRINTER_HOST`; it never invokes the macOS print
+driver. Confirm the printer's selected roll size matches the launcher setting.
+Press Ctrl-C in the launcher terminal to stop the local server.
 
 ## Operational notes
 
@@ -140,11 +169,12 @@ launcher setting. Press Ctrl-C in the launcher terminal to stop the local server
 
 ## Direct printing with auto cut (Brother VC-500W)
 
-The macOS print driver can't turn on the VC-500W's auto cut. Setting
-`PRINTER_HOST` makes the dev server send the job straight to the printer over
+Setting `PRINTER_HOST` makes the dev server send the job straight to the printer over
 the network (TCP 9100) with `<cutmode>full</cutmode>`, using the protocol from
-[vc-500w_autocut](https://github.com/corentin-soriano/vc-500w_autocut). If the
-direct job fails, the app falls back to the normal `window.print()` path.
+[vc-500w_autocut](https://github.com/corentin-soriano/vc-500w_autocut). The app
+does not fall back to the macOS print driver: if direct printing fails, it
+shows an error. The entry has already been saved, and retrying the print does
+not create a second entry.
 
 Requirements: the printer must be reachable by IP from the Mac (Wi-Fi or
 Wireless Direct). USB-only will not work for this path.

@@ -6,8 +6,8 @@ const DPI = 300;
 const MM_PER_IN = 25.4;
 const WIDTH_IN = PRINT_WIDTH_MM / MM_PER_IN;
 
-function inchesToPx(inches) {
-  return Math.round(inches * DPI);
+function inchesToPx(inches, dpi = DPI) {
+  return Math.round(inches * dpi);
 }
 
 function loadImageFromBlob(blob) {
@@ -71,35 +71,46 @@ function wrapName(ctx, name, maxWidth) {
   return lines.map((l) => l.trim()).filter(Boolean);
 }
 
-export async function composePrintImage({ photoBlob, name }) {
+async function getPrintLayout(name, dpi = DPI) {
+  const fontPx = Math.round((18 / 72) * dpi * PRINT_SCALE);
+  await document.fonts.load(`600 ${fontPx}px "Caveat"`);
+  await document.fonts.ready;
+
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+  measureContext.font = `600 ${fontPx}px "Caveat", cursive`;
+  const maxWidth = measureContext.measureText("ReallyLongNameWhoaT").width;
+  const lines = wrapName(measureContext, name, maxWidth);
+  const photoHeight = inchesToPx(PRINT_PHOTO_HEIGHT_IN, dpi) - (lines.length - 1) * fontPx;
+
+  return { fontPx, lines, photoHeight };
+}
+
+export async function getPrintPhotoAspectRatio(name) {
+  const { photoHeight } = await getPrintLayout(name);
+  return inchesToPx(WIDTH_IN) / photoHeight;
+}
+
+export async function composePrintImage({ photoBlob, name, dpi = DPI }) {
   const canvas = document.createElement("canvas");
-  canvas.width = inchesToPx(WIDTH_IN);
-  canvas.height = inchesToPx(PRINT_IMAGE_HEIGHT_IN);
+  canvas.width = inchesToPx(WIDTH_IN, dpi);
+  canvas.height = inchesToPx(PRINT_IMAGE_HEIGHT_IN, dpi);
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const photo = await loadImageFromBlob(photoBlob);
-
-  const fontPx = Math.round((18 / 72) * DPI * PRINT_SCALE);
-  await document.fonts.load(`600 ${fontPx}px "Caveat"`);
-  await document.fonts.ready;
+  const { fontPx, lines, photoHeight } = await getPrintLayout(name, dpi);
   ctx.font = `600 ${fontPx}px "Caveat", cursive`;
 
-  // Names up to this width stay on one line; longer ones wrap onto more lines.
-  const maxWidth = ctx.measureText("ReallyLongNameWhoaT").width;
-  const lines = wrapName(ctx, name, maxWidth);
-
-  // Each extra line takes its height from the photo so the label length stays the same.
-  const photoH = inchesToPx(PRINT_PHOTO_HEIGHT_IN) - (lines.length - 1) * fontPx;
-  drawCover(ctx, photo, 0, 0, canvas.width, photoH);
+  drawCover(ctx, photo, 0, 0, canvas.width, photoHeight);
 
   // Caption, centered in the remaining white strip at the bottom.
   ctx.fillStyle = "#2b2620";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const captionCenterY = photoH + (inchesToPx(PRINT_ARTWORK_HEIGHT_IN) - photoH) / 2;
+  const captionCenterY = photoHeight + (inchesToPx(PRINT_ARTWORK_HEIGHT_IN, dpi) - photoHeight) / 2;
   lines.forEach((line, i) => {
     ctx.fillText(line, canvas.width / 2, captionCenterY + (i - (lines.length - 1) / 2) * fontPx);
   });

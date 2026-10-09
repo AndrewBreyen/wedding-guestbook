@@ -1,17 +1,41 @@
 import { useEffect, useRef, useState } from "react";
+import { getPrintPhotoAspectRatio } from "../composePrintImage";
 
 export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onCalibrationPrint }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const photoInputRef = useRef(null);
   const streamRef = useRef(null);
   const [name, setName] = useState(draft.name || "");
   const [notes, setNotes] = useState(draft.notes || "");
   const [cameraError, setCameraError] = useState(null);
   const [demoPrintError, setDemoPrintError] = useState(null);
+  const [photoLayoutError, setPhotoLayoutError] = useState(null);
   const [printingDemo, setPrintingDemo] = useState(false);
   const [ready, setReady] = useState(false);
-  const [count, setCount] = useState(null);
-  const countTimerRef = useRef(null);
+  const [photoAspectRatio, setPhotoAspectRatio] = useState(1);
+  const [layoutName, setLayoutName] = useState(null);
+  const effectiveName = name.trim() || "Guest";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLayoutName(null);
+    setPhotoLayoutError(null);
+    getPrintPhotoAspectRatio(effectiveName)
+      .then((ratio) => {
+        if (!cancelled) {
+          setPhotoAspectRatio(ratio);
+          setLayoutName(effectiveName);
+        }
+      })
+      .catch((err) => {
+        console.error("Unable to calculate the print preview crop:", err);
+        if (!cancelled) setPhotoLayoutError("Could not prepare the print preview. Please try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,33 +73,54 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const videoRatio = video.videoWidth / video.videoHeight;
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = video.videoWidth;
+    let sourceHeight = video.videoHeight;
+    if (videoRatio > photoAspectRatio) {
+      sourceWidth = video.videoHeight * photoAspectRatio;
+      sourceX = (video.videoWidth - sourceWidth) / 2;
+    } else {
+      sourceHeight = video.videoWidth / photoAspectRatio;
+      sourceY = (video.videoHeight - sourceHeight) / 2;
+    }
+
+    canvas.width = Math.round(sourceWidth);
+    canvas.height = Math.round(sourceHeight);
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      video,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
 
     canvas.toBlob(
-      (blob) => {
-        if (blob) onTakePhoto({ name: name.trim(), notes: notes.trim(), photoBlob: blob });
+      (photoBlob) => {
+        if (photoBlob) {
+          onTakePhoto({
+            name: name.trim(),
+            notes: notes.trim(),
+            photoBlob,
+            photoAspectRatio,
+          });
+        }
       },
       "image/jpeg",
       0.92
     );
   }
 
-  function startCountdown() {
-    setCount(3);
-    countTimerRef.current = setInterval(() => {
-      setCount((prev) => {
-        if (prev <= 1) {
-          clearInterval(countTimerRef.current);
-          // Fire after this render so the "Smile!" frame has a beat to show.
-          setTimeout(capturePhoto, 200);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  function handlePhotoSelected(event) {
+    const photoBlob = event.target.files?.[0];
+    if (photoBlob) onTakePhoto({ name: name.trim(), notes: notes.trim(), photoBlob, photoAspectRatio });
+    event.target.value = "";
   }
 
   async function printTest(onPrint) {
@@ -90,11 +135,11 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
     }
   }
 
-  useEffect(() => {
-    return () => clearInterval(countTimerRef.current);
-  }, []);
-
-  const canCapture = ready && name.trim().length > 0 && !cameraError && count === null;
+  const canCapture = ready
+    && name.trim().length > 0
+    && layoutName === effectiveName
+    && !photoLayoutError
+    && !cameraError;
 
   return (
     <div className="screen capture-screen">
@@ -115,30 +160,45 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
         maxLength={280}
       />
 
-      <div className="camera-frame">
+      <div className="camera-frame" style={{ aspectRatio: photoAspectRatio }}>
         {cameraError ? (
-          <p className="camera-error">{cameraError}</p>
+          <div>
+            <p className="camera-error">{cameraError}</p>
+          </div>
         ) : (
           <video ref={videoRef} autoPlay playsInline muted />
         )}
         <canvas ref={canvasRef} style={{ display: "none" }} />
-        {count !== null && (
-          <div className="countdown-overlay">{count > 0 ? count : "Smile!"}</div>
-        )}
       </div>
 
       <button
         className="shutter-btn"
-        onClick={startCountdown}
+        onClick={capturePhoto}
         disabled={!canCapture}
         aria-label="Take photo"
       />
-      {!name.trim() && count === null && (
+      {cameraError && <span className="sr-only">Use “Take or choose a photo” to continue.</span>}
+      {!name.trim() && (
         <p className="form-error">Enter your name to take a photo</p>
       )}
+      {photoLayoutError && <p className="form-error" role="alert">{photoLayoutError}</p>}
 
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoSelected}
+        hidden
+      />
       <div className="capture-footer">
-        <button className="btn-text" onClick={() => printTest(onDemoPrint)} disabled={printingDemo}>
+        <button
+          className="btn-text"
+          onClick={() => photoInputRef.current?.click()}
+          disabled={!name.trim() || layoutName !== effectiveName || Boolean(photoLayoutError)}
+        >
+          Choose photo
+        </button>
+        <button className="btn-text" onClick={() => printTest(() => onDemoPrint(name.trim()))} disabled={printingDemo}>
           {printingDemo ? "Preparing print..." : "Demo print"}
         </button>
         <button className="btn-text" onClick={() => printTest(onCalibrationPrint)} disabled={printingDemo}>

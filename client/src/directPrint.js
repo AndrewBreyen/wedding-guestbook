@@ -10,6 +10,10 @@ export const DIRECT_PRINT_ENABLED = import.meta.env.VITE_DIRECT_PRINT === "1";
 const TARGET_DPI = Number(import.meta.env.VITE_DIRECT_PRINT_DPI || 313);
 
 export async function directPrint(imageBlob, copies = 1) {
+  if (!DIRECT_PRINT_ENABLED) {
+    throw new Error("Network printing is not configured. Start the guestbook with a reachable printer configured.");
+  }
+
   const bitmap = await createImageBitmap(imageBlob);
   const width = Math.round((PRINT_WIDTH_MM / 25.4) * TARGET_DPI);
   const height = Math.round(bitmap.height * (width / bitmap.width));
@@ -39,18 +43,5 @@ export async function directPrint(imageBlob, copies = 1) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Direct print failed (${res.status}).`);
-  }
-}
-
-// Returns true if the job was sent; false means the caller should fall back to
-// the normal window.print() path.
-export async function tryDirectPrint(imageBlob) {
-  if (!DIRECT_PRINT_ENABLED) return false;
-  try {
-    await directPrint(imageBlob);
-    return true;
-  } catch (err) {
-    console.error("Direct print failed, falling back to window.print():", err);
-    return false;
   }
 }

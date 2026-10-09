@@ -13,13 +13,15 @@ done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLIENT_DIR="$ROOT_DIR/client"
-URL="http://localhost:5173"
+URL="https://localhost:5173"
 VITE_BIN="$CLIENT_DIR/node_modules/.bin/vite"
 
 if [[ ! -x "$VITE_BIN" ]]; then
   echo "Client dependencies are missing. Run 'npm ci --prefix client' first." >&2
   exit 1
 fi
+
+"$ROOT_DIR/setup-lan-https.sh"
 
 if [[ "$KIOSK" -eq 1 ]] && ! open -Ra "Google Chrome" >/dev/null 2>&1; then
   echo "Google Chrome was not found. Install Chrome before launching the kiosk." >&2
@@ -39,9 +41,8 @@ if [[ "$TEST_MODE" -eq 1 ]]; then
   echo "Test mode enabled: print jobs will be simulated."
 fi
 
-# Set PRINTER_HOST to the VC-500W's IP to print directly with auto cut
-# (bypasses the macOS print driver; falls back to it if the direct job fails).
-PRINTER_HOST="192.168.8.228"
+# Set PRINTER_HOST to the VC-500W's IP to print directly with auto cut.
+PRINTER_HOST="${PRINTER_HOST:-192.168.8.228}"
 if [[ -n "${PRINTER_HOST:-}" ]]; then
   export PRINTER_HOST
   export VITE_DIRECT_PRINT=1
@@ -49,7 +50,7 @@ if [[ -n "${PRINTER_HOST:-}" ]]; then
 fi
 
 cd "$CLIENT_DIR"
-"$VITE_BIN" --host 127.0.0.1 --port 5173 --strictPort &
+LOCAL_HTTPS=1 "$VITE_BIN" --host 0.0.0.0 --port 5173 --strictPort &
 SERVER_PID=$!
 
 cleanup() {
@@ -64,7 +65,7 @@ for attempt in {1..30}; do
     echo "The Vite server exited before becoming ready." >&2
     exit 1
   fi
-  if curl --silent --fail "$URL" >/dev/null; then
+  if curl --silent --insecure --fail "$URL" >/dev/null; then
     break
   fi
   if [[ "$attempt" -eq 30 ]]; then
@@ -75,9 +76,20 @@ for attempt in {1..30}; do
 done
 
 if [[ "$KIOSK" -eq 1 ]]; then
-  echo "Opening Chrome in kiosk-printing mode. Press Ctrl-C here to stop the server."
-  open -na "Google Chrome" --args --kiosk --kiosk-printing "$URL"
+  echo "Opening Chrome in kiosk mode at $URL. Press Ctrl-C here to stop the server."
+  open -na "Google Chrome" --args --kiosk "$URL"
 else
-  echo "Guestbook ready at $URL. Pass -k to open Chrome in kiosk-printing mode. Press Ctrl-C here to stop the server."
+  echo "Guestbook ready at $URL. Pass -k to open Chrome in kiosk mode."
 fi
+DEFAULT_INTERFACE="$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')"
+LAN_IP=""
+if [[ -n "$DEFAULT_INTERFACE" ]]; then
+  LAN_IP="$(ipconfig getifaddr "$DEFAULT_INTERFACE" 2>/dev/null || true)"
+fi
+if [[ -n "$LAN_IP" ]]; then
+  echo "On the same network, open https://$LAN_IP:5173 on another device."
+else
+  echo "To connect another device, find this Mac's LAN IP and open https://<LAN-IP>:5173."
+fi
+echo "If it cannot connect, check that both devices are on the same Wi-Fi and allow incoming connections through the Mac firewall."
 wait "$SERVER_PID"
