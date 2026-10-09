@@ -105,12 +105,21 @@ For example:
 VITE_PRINT_WIDTH_MM=25 npm run dev
 ```
 
-To start the guestbook and Chrome in kiosk-printing mode, run this from the
-project root:
+To start the guestbook server, run this from the project root:
 
 ```bash
 ./launch.sh
 ```
+
+Pass `-k` to also open Chrome in kiosk-printing mode:
+
+```bash
+./launch.sh -k
+```
+
+Pass `-t` to simulate print jobs without sending them to the network printer or
+macOS. A small notice shows which print route would have been used. Combine it
+with `-k` to run the app in kiosk mode, for example `./launch.sh -k -t`.
 
 The launcher defaults to 25 mm labels. Use `VITE_PRINT_WIDTH_MM=50 ./launch.sh`
 for 2-inch stock. After a guest confirms their entry, it prints automatically to
@@ -141,8 +150,11 @@ Requirements: the printer must be reachable by IP from the Mac (Wi-Fi or
 Wireless Direct). USB-only will not work for this path.
 
 ```bash
-PRINTER_HOST=192.168.x.x ./launch.sh
+./launch.sh
 ```
+
+The launcher defaults to `192.168.8.228`. To use a different printer, override
+it with `PRINTER_HOST=192.168.x.x ./launch.sh`.
 
 Optional env vars: `PRINTER_PORT` (default 9100), `PRINTER_DRY_RUN=1` (log the
 job without contacting the printer), `VITE_DIRECT_PRINT_DPI` (default 313,

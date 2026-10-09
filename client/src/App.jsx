@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Welcome from "./screens/Welcome.jsx";
 import Capture from "./screens/Capture.jsx";
 import Confirm from "./screens/Confirm.jsx";
@@ -15,6 +15,8 @@ import { PRINT_CARD_HEIGHT_IN, PRINT_HEIGHT_IN, PRINT_WIDTH_MM } from "./printCo
 import demoPortrait from "./assets/demo-portrait-one.png";
 
 const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null };
+const PRINT_TEST_MODE = import.meta.env.VITE_PRINT_TEST_MODE === "1";
+const DIRECT_PRINT_ENABLED = import.meta.env.VITE_DIRECT_PRINT === "1";
 
 export default function App() {
   const query = new URLSearchParams(window.location.search);
@@ -29,6 +31,31 @@ function GuestbookApp() {
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [printEntry, setPrintEntry] = useState(null);
   const [savedName, setSavedName] = useState("");
+  const [printPreview, setPrintPreview] = useState(null);
+  const previewTimer = useRef(null);
+  const previewUrl = useRef(null);
+
+  function announceSimulatedPrint(imageBlob) {
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    const url = URL.createObjectURL(imageBlob);
+    previewUrl.current = url;
+    setPrintPreview({
+      url,
+      route: DIRECT_PRINT_ENABLED ? "over the network" : "through macOS",
+    });
+    previewTimer.current = window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      previewUrl.current = null;
+      previewTimer.current = null;
+      setPrintPreview(null);
+    }, 6000);
+  }
+
+  useEffect(() => () => {
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+  }, []);
 
   function goHome() {
     setScreen("welcome");
@@ -41,8 +68,16 @@ function GuestbookApp() {
   }
 
   async function handleConfirm() {
-    // Save the original capture and a composed image sized for the Brother label.
+    // Compose the print image before choosing the real-save or test-mode path.
     const printImageBlob = await composePrintImage({ photoBlob: draft.photoBlob, name: draft.name });
+
+    if (PRINT_TEST_MODE) {
+      announceSimulatedPrint(printImageBlob);
+      setSavedName(draft.name);
+      setScreen("thanks");
+      return;
+    }
+
     const saved = await saveEntry({ ...draft, printImageBlob });
 
     // Preferred path: send straight to the printer with auto cut (needs PRINTER_HOST).
@@ -88,6 +123,10 @@ function GuestbookApp() {
   }
 
   async function printTestImage(printImageBlob, heightIn = PRINT_HEIGHT_IN) {
+    if (PRINT_TEST_MODE) {
+      announceSimulatedPrint(printImageBlob);
+      return;
+    }
     if (await tryDirectPrint(printImageBlob)) return;
 
     const printImageUrl = URL.createObjectURL(printImageBlob);
@@ -147,6 +186,12 @@ function GuestbookApp() {
       {screen === "viewAll" && <ViewAll onBack={goHome} />}
 
       <PrintCard entry={printEntry} />
+      {printPreview && (
+        <div className="print-test-preview" role="status">
+          <img src={printPreview.url} alt="Preview of the simulated print" />
+          <span>Test mode. Not saving record. Would print {printPreview.route}</span>
+        </div>
+      )}
     </div>
   );
 }
