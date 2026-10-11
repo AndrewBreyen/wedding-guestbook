@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getPrintPhotoAspectRatio } from "../composePrintImage";
 
-export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onCalibrationPrint }) {
+export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onCalibrationPrint, adminMode }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const photoInputRef = useRef(null);
@@ -179,7 +179,7 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
       />
       {cameraError && <span className="sr-only">Use “Take or choose a photo” to continue.</span>}
       {!name.trim() && (
-        <p className="form-error">Enter your name to take a photo</p>
+        <p className="capture-hint">Enter your name first to enable “Choose photo” and take a photo.</p>
       )}
       {photoLayoutError && <p className="form-error" role="alert">{photoLayoutError}</p>}
 
@@ -192,19 +192,23 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
       />
       <div className="capture-footer">
         <button
-          className="btn-text"
+          className="btn btn-secondary capture-nav-btn choose-photo-btn"
           onClick={() => photoInputRef.current?.click()}
           disabled={!name.trim() || layoutName !== effectiveName || Boolean(photoLayoutError)}
         >
-          Choose photo
+          Choose photo or take a photo with device camera
         </button>
-        <button className="btn-text" onClick={() => printTest(() => onDemoPrint(name.trim()))} disabled={printingDemo}>
-          {printingDemo ? "Preparing print..." : "Demo print"}
-        </button>
-        <button className="btn-text" onClick={() => printTest(onCalibrationPrint)} disabled={printingDemo}>
-          Calibration print
-        </button>
-        <button className="btn-text" onClick={onCancel}>
+        {adminMode && (
+          <>
+            <button className="btn-text" onClick={() => printTest(() => onDemoPrint(name.trim()))} disabled={printingDemo}>
+              {printingDemo ? "Preparing print..." : "Demo print"}
+            </button>
+            <button className="btn-text" onClick={() => printTest(onCalibrationPrint)} disabled={printingDemo}>
+              Calibration print
+            </button>
+          </>
+        )}
+        <button className="btn btn-secondary capture-nav-btn" onClick={onCancel}>
           Back to home
         </button>
       </div>

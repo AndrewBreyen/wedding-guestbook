@@ -14,6 +14,7 @@ import demoPortrait from "./assets/demo-portrait-one.png";
 
 const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null, photoAspectRatio: null, isDemo: false };
 const PRINT_TEST_MODE = import.meta.env.VITE_PRINT_TEST_MODE === "1";
+const ADMIN_MODE = import.meta.env.VITE_ADMIN_MODE === "1";
 
 export default function App() {
   return (
@@ -142,6 +143,7 @@ function GuestbookApp() {
           onCancel={goHome}
           onDemoPrint={handleDemoPrint}
           onCalibrationPrint={handleCalibrationPrint}
+          adminMode={ADMIN_MODE}
         />
       )}
 

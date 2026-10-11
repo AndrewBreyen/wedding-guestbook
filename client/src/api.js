@@ -23,6 +23,7 @@ const demoEntries = DEMO_MODE
     ]
   : [];
 const API_URL = (import.meta.env.VITE_API_URL || "https://wmuwh7dlg1.execute-api.us-east-1.amazonaws.com").replace(/\/$/, "");
+const LOCAL_GUESTBOOK_PROXY = import.meta.env.DEV;
 
 function requireApiUrl() {
   return API_URL;
@@ -34,7 +35,9 @@ function createDemoId() {
 
 export async function fetchEntries() {
   if (DEMO_MODE) return [...demoEntries];
-  const response = await fetch(`${requireApiUrl()}/entries`);
+  const response = LOCAL_GUESTBOOK_PROXY
+    ? await fetch("/api/guestbook/entries")
+    : await fetch(`${requireApiUrl()}/entries`);
   if (!response.ok) throw new Error("Could not load entries.");
   return response.json();
 }
@@ -60,6 +63,24 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
   if (!printImageBlob) throw new Error("Print image is required.");
 
   try {
+    if (LOCAL_GUESTBOOK_PROXY) {
+      const response = await fetch("/api/guestbook/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          notes: (notes || "").trim(),
+          photo: await blobToBase64(photoBlob),
+          printImage: await blobToBase64(printImageBlob),
+        }),
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error || "Could not save the guest entry.");
+      }
+      return response.json();
+    }
+
     const apiUrl = requireApiUrl();
     const id = crypto.randomUUID();
     const uploadResponse = await fetch(`${apiUrl}/uploads`, {
@@ -88,6 +109,21 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
     const message = err.message || "Could not save entry. Check your connection and try again.";
     throw new Error(message, { cause: err });
   }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Could not encode an image for upload."));
+        return;
+      }
+      resolve(reader.result.slice(reader.result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error || new Error("Could not read an image for upload."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function checkUpload(response) {

@@ -76,14 +76,14 @@ To start the guestbook server, run this from the project root:
 ```
 
 The launcher serves the app over HTTPS on the local network, allowing iPhones
-to use the live camera preview. On first run it creates and trusts a local
-certificate authority on the Mac. To connect an iPhone, install the CA
-certificate printed by the launcher/setup script:
+to use the live camera preview. Set up the local certificate once before
+launching:
 
 1. Install `mkcert` on the Mac (`brew install mkcert`).
 2. Run `./setup-lan-https.sh` from the project root. It prints the path to
-   `rootCA.cer`; transfer that certificate to the iPhone using AirDrop or
-   another private method. **Never transfer `rootCA-key.pem`.**
+   `rootCA.cer` and creates the HTTPS certificate used by the launcher. Transfer
+   the CA certificate to the iPhone using AirDrop or another private method.
+   **Never transfer `rootCA-key.pem`.**
 3. On the iPhone, open the certificate and install its configuration profile
    in Settings. Then go to **Settings → General → About → Certificate Trust
    Settings** and enable full trust for the local certificate.
@@ -93,15 +93,25 @@ certificate printed by the launcher/setup script:
    the new home-screen icon. This uses the Apple Touch Icon and hides Safari's
    browser controls. The iOS status bar remains visible over the app.
 
-The certificate is regenerated when `./launch.sh` starts, so a changed Mac
-LAN IP is covered automatically. If the iPhone shows a certificate warning,
-reinstall/trust the CA certificate before using the camera. Keep the Mac and
-guest devices on the same Wi-Fi; check the Mac firewall and Wi-Fi client
-isolation if the address cannot be reached. Entries/photos still use the
-configured AWS API, and direct print jobs are sent by the Mac to the printer
-configured by `PRINTER_HOST`. GitHub Pages supports the live camera, but does
-not currently connect to the Mac's private print bridge; use the LAN-hosted app
-URL for automatic network printing.
+`./launch.sh` only starts the app; it does not generate certificates. The
+setup script includes all active IPv4 interface addresses in the certificate,
+and the launcher lists the addresses to use from each connected network. The
+existing HTTPS certificate remains in place between launches. Run
+`./setup-lan-https.sh` again if the Mac's network addresses change. If the
+iPhone shows a certificate warning, reinstall/trust the CA certificate before
+using the camera. Keep the iPhone and Mac on the same network; check the Mac
+firewall and Wi-Fi client isolation if the address cannot be reached.
+
+For an iPad on a local Wi-Fi network without internet, keep the Mac connected
+to that network and to an internet-enabled network. In local development, the
+Mac relays guestbook reads, saves, and image uploads to the AWS API and S3, so
+the iPad only needs to reach the Mac. The Mac must have outbound internet
+access for guestbook entries to save; printing remains handled by the Mac.
+
+Entries/photos still use the configured AWS API, and direct print jobs are
+sent by the Mac to the printer configured by `PRINTER_HOST`. GitHub Pages
+supports the live camera, but does not currently connect to the Mac's private
+print bridge; use the LAN-hosted app URL for automatic network printing.
 
 Pass `-k` to also open Chrome in kiosk mode:
 
@@ -109,9 +119,15 @@ Pass `-k` to also open Chrome in kiosk mode:
 ./launch.sh -k
 ```
 
+Pass `-a` to show the admin-only demo and calibration print buttons:
+
+```bash
+./launch.sh -a
+```
+
 Pass `-t` to enable test mode. A persistent banner warns that nothing will be
 saved or printed; guest entries and print jobs are simulated. Combine it with
-`-k` to run the app in kiosk mode, for example `./launch.sh -k -t`.
+other launcher options as needed, for example `./launch.sh -a -k -t`.
 
 The launcher defaults to 50 mm labels. Use `VITE_PRINT_WIDTH_MM=25 ./launch.sh`
 for 1-inch stock. At startup, it reports the label width and whether it is

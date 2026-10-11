@@ -3,16 +3,19 @@ set -euo pipefail
 
 KIOSK=0
 TEST_MODE=0
-while getopts "kt" opt; do
+ADMIN_MODE=0
+while getopts "akt" opt; do
   case "$opt" in
+    a) ADMIN_MODE=1 ;;
     k) KIOSK=1 ;;
     t) TEST_MODE=1 ;;
-    *) echo "Usage: $0 [-k] [-t]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [-a] [-k] [-t]" >&2; exit 2 ;;
   esac
 done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLIENT_DIR="$ROOT_DIR/client"
+CERT_DIR="$CLIENT_DIR/.local-certs"
 URL="https://localhost:5173"
 VITE_BIN="$CLIENT_DIR/node_modules/.bin/vite"
 
@@ -21,7 +24,10 @@ if [[ ! -x "$VITE_BIN" ]]; then
   exit 1
 fi
 
-"$ROOT_DIR/setup-lan-https.sh"
+if [[ ! -r "$CERT_DIR/lan.pem" || ! -r "$CERT_DIR/lan-key.pem" ]]; then
+  echo "Local HTTPS certificates are missing. Run './setup-lan-https.sh' before launching." >&2
+  exit 1
+fi
 
 if [[ "$KIOSK" -eq 1 ]] && ! open -Ra "Google Chrome" >/dev/null 2>&1; then
   echo "Google Chrome was not found. Install Chrome before launching the kiosk." >&2
@@ -35,6 +41,10 @@ if [[ "$VITE_PRINT_WIDTH_MM" != "25" && "$VITE_PRINT_WIDTH_MM" != "50" ]]; then
 fi
 export VITE_PRINT_WIDTH_MM
 export VITE_PRINT_TEST_MODE=0
+export VITE_ADMIN_MODE=0
+if [[ "$ADMIN_MODE" -eq 1 ]]; then
+  export VITE_ADMIN_MODE=1
+fi
 if [[ "$TEST_MODE" -eq 1 ]]; then
   export VITE_PRINT_TEST_MODE=1
   export PRINTER_DRY_RUN=1
@@ -137,15 +147,31 @@ if [[ "$KIOSK" -eq 1 ]]; then
 else
   echo "Guestbook ready at $URL. Pass -k to open Chrome in kiosk mode."
 fi
-DEFAULT_INTERFACE="$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')"
-LAN_IP=""
-if [[ -n "$DEFAULT_INTERFACE" ]]; then
-  LAN_IP="$(ipconfig getifaddr "$DEFAULT_INTERFACE" 2>/dev/null || true)"
-fi
-if [[ -n "$LAN_IP" ]]; then
-  echo "On the same network, open https://$LAN_IP:5173 on another device."
+LAN_IPS=()
+LAN_IP_COUNT=0
+for interface in $(ifconfig -l); do
+  interface_ip="$(ipconfig getifaddr "$interface" 2>/dev/null || true)"
+  if [[ -n "$interface_ip" && "$interface_ip" != 127.* ]]; then
+    already_added=0
+    if [[ "$LAN_IP_COUNT" -gt 0 ]]; then
+      for lan_ip in "${LAN_IPS[@]}"; do
+        if [[ "$lan_ip" == "$interface_ip" ]]; then
+          already_added=1
+          break
+        fi
+      done
+    fi
+    if [[ "$already_added" -eq 0 ]]; then
+      LAN_IPS+=("$interface_ip")
+      LAN_IP_COUNT=$((LAN_IP_COUNT + 1))
+    fi
+  fi
+done
+if [[ "$LAN_IP_COUNT" -gt 0 ]]; then
+  echo "On another device, open the address for the network it is connected to:"
+  printf '  https://%s:5173\n' "${LAN_IPS[@]}"
 else
   echo "To connect another device, find this Mac's LAN IP and open https://<LAN-IP>:5173."
 fi
-echo "If it cannot connect, check that both devices are on the same Wi-Fi and allow incoming connections through the Mac firewall."
+echo "If a device cannot connect, check that it is on the same network and allow incoming connections through the Mac firewall."
 wait "$SERVER_PID"
