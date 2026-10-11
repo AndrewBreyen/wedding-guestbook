@@ -1,4 +1,4 @@
-const configuredWidth = import.meta.env.VITE_PRINT_WIDTH_MM || "25";
+const configuredWidth = import.meta.env.VITE_PRINT_WIDTH_MM || "50";
 
 if (configuredWidth !== "25" && configuredWidth !== "50") {
   throw new Error("VITE_PRINT_WIDTH_MM must be either 25 or 50.");

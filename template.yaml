@@ -3,19 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: AWS backend for the wedding guestbook (GitHub Pages hosts the static client).
 
 Parameters:
-  CameraPhotosPerGuest:
-    Type: Number
-    Default: 5
-    MinValue: 1
-    MaxValue: 20
-    Description: Maximum disposable-camera photos per browser session.
-  CameraAdminCodeHash:
-    Type: String
-    Default: ""
-    NoEcho: true
-    AllowedPattern: "^$|^[A-Fa-f0-9]{64}$"
-    Description: SHA-256 hex digest of the host-only camera admin code. Leave empty to disable host controls.
-
 Globals:
   Function:
     Runtime: nodejs24.x
@@ -28,8 +15,8 @@ Resources:
     Properties:
       CorsConfiguration:
         AllowOrigins: ["*"]
-        AllowMethods: [GET, POST, DELETE, OPTIONS]
-        AllowHeaders: [content-type, authorization]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
         MaxAge: 600
 
   EntriesTable:
@@ -45,21 +32,6 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-
-  CameraTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: cameraId
-          AttributeType: S
-        - AttributeName: itemId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: cameraId
-          KeyType: HASH
-        - AttributeName: itemId
-          KeyType: RANGE
 
   PhotosBucket:
     Type: AWS::S3::Bucket
@@ -86,30 +58,17 @@ Resources:
         Variables:
           TABLE_NAME: !Ref EntriesTable
           BUCKET_NAME: !Ref PhotosBucket
-          CAMERA_TABLE: !Ref CameraTable
-          CAMERA_PHOTOS_PER_GUEST: !Ref CameraPhotosPerGuest
-          CAMERA_ADMIN_CODE_HASH: !Ref CameraAdminCodeHash
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EntriesTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref CameraTable
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:TransactWriteItems
-              Resource: !GetAtt CameraTable.Arn
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
                 - s3:PutObject
                 - s3:GetObject
-                - s3:DeleteObject
               Resource:
                 - !Sub "${PhotosBucket.Arn}/photos/*"
-                - !Sub "${PhotosBucket.Arn}/disposable/*"
       Events:
         Uploads:
           Type: HttpApi
@@ -129,67 +88,6 @@ Resources:
             ApiId: !Ref GuestbookApi
             Path: /entries
             Method: POST
-        CameraSessionRead:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/session
-            Method: GET
-        CameraSessionWrite:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/session
-            Method: POST
-        CameraUploads:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/uploads
-            Method: POST
-        CameraComplete:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/complete
-            Method: POST
-        CameraGallery:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/photos
-            Method: GET
-        CameraMyPhotosRead:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/my-photos
-            Method: GET
-        CameraMyPhotosDelete:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /camera/my-photos
-            Method: DELETE
-        CameraAdminPhotosRead:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /admin/camera/photos
-            Method: GET
-        CameraAdminPhotosDelete:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /admin/camera/photos
-            Method: DELETE
-        CameraAdminReveal:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref GuestbookApi
-            Path: /admin/camera/reveal
-            Method: POST
-
 Outputs:
   ApiUrl:
     Description: Set this as the GitHub Actions variable VITE_API_URL.

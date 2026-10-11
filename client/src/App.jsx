@@ -4,8 +4,6 @@ import Capture from "./screens/Capture.jsx";
 import Confirm from "./screens/Confirm.jsx";
 import Thanks from "./screens/Thanks.jsx";
 import ViewAll from "./screens/ViewAll.jsx";
-import DisposableCamera from "./screens/DisposableCamera.jsx";
-import CameraAdmin from "./screens/CameraAdmin.jsx";
 import PrintPreviewImage from "./PrintPreviewImage.jsx";
 import { saveEntry } from "./api";
 import { composePrintImage } from "./composePrintImage";
@@ -18,15 +16,6 @@ const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null, photoAspectRatio: nu
 const PRINT_TEST_MODE = import.meta.env.VITE_PRINT_TEST_MODE === "1";
 
 export default function App() {
-  const query = new URLSearchParams(window.location.search);
-  const returnToGuestbook = () => { window.location.href = window.location.pathname; };
-  let content = <GuestbookApp />;
-  if (!PRINT_TEST_MODE && query.get("camera-admin") === "1") {
-    content = <CameraAdmin onBack={returnToGuestbook} />;
-  } else if (!PRINT_TEST_MODE && query.get("camera") === "1") {
-    content = <DisposableCamera onBack={returnToGuestbook} />;
-  }
-
   return (
     <>
       {PRINT_TEST_MODE && (
@@ -34,7 +23,7 @@ export default function App() {
           TEST MODE — Nothing will be saved or printed
         </div>
       )}
-      {content}
+      <GuestbookApp />
     </>
   );
 }
@@ -144,13 +133,7 @@ function GuestbookApp() {
 
   return (
     <div className={`app${PRINT_TEST_MODE ? " app-test-mode" : ""}`}>
-      {screen === "welcome" && (
-        <Welcome onStart={() => setScreen("capture")} onViewAll={() => setScreen("viewAll")} onDisposableCamera={PRINT_TEST_MODE ? null : () => {
-          const url = new URL(window.location.href);
-          url.search = "?camera=1";
-          window.location.assign(url);
-        }} />
-      )}
+      {screen === "welcome" && <Welcome onStart={() => setScreen("capture")} onViewAll={() => setScreen("viewAll")} />}
 
       {screen === "capture" && (
         <Capture
