@@ -41,15 +41,19 @@ export async function handler(event) {
     }
 
     if (method === "POST" && path === "/entries") {
-      const { id, name, notes = "" } = parseBody(event);
+      const { id, name, notes = "", email = "" } = parseBody(event);
       if (!/^[0-9a-f-]{36}$/i.test(id || "") || typeof name !== "string" || !name.trim()) {
         return response(400, { error: "A valid id and name are required." });
+      }
+      if (typeof email !== "string" || email.trim().length > 254 || (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) {
+        return response(400, { error: "Enter a valid email address." });
       }
       const entry = {
         id,
         itemType: "guestbook",
         name: name.trim().slice(0, 100),
         notes: typeof notes === "string" ? notes.trim().slice(0, 1000) : "",
+        ...(email.trim() ? { email: email.trim() } : {}),
         photoKey: `photos/${id}-photo.jpg`,
         printKey: `photos/${id}-print.jpg`,
         createdAt: new Date().toISOString(),

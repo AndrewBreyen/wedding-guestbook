@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PrintPreviewImage from "../PrintPreviewImage.jsx";
 import { composePrintImage } from "../composePrintImage";
 
-export default function Confirm({ draft, onRetake, onConfirm }) {
+export default function Confirm({ draft, emailLocked, onEmailChange, onRetake, onConfirm }) {
+  const emailInputRef = useRef(null);
   const [printPreview, setPrintPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -36,10 +37,15 @@ export default function Confirm({ draft, onRetake, onConfirm }) {
 
   async function handleConfirm() {
     if (!printPreview) return;
+    const email = (draft.email || "").trim();
+    if (email && !emailInputRef.current?.checkValidity()) {
+      emailInputRef.current.reportValidity();
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await onConfirm(printPreview.blob);
+      await onConfirm(printPreview.blob, email);
     } catch (err) {
       setError(err.message || "Something went wrong saving your entry. Please try again.");
       setSaving(false);
@@ -59,6 +65,22 @@ export default function Confirm({ draft, onRetake, onConfirm }) {
           <p>{previewError || "Preparing your print preview…"}</p>
         )}
       </div>
+      <label className="confirm-email-label" htmlFor="guest-email">
+        Email the photo to be sent to after the wedding (optional)
+        <input
+          ref={emailInputRef}
+          id="guest-email"
+          className="confirm-email-input"
+          type="email"
+          autoComplete="email"
+          maxLength={254}
+          value={draft.email || ""}
+          onChange={(event) => onEmailChange(event.target.value)}
+          placeholder="you@example.com"
+          disabled={saving || emailLocked}
+        />
+        {emailLocked && <span className="confirm-email-hint">Email saved with this entry.</span>}
+      </label>
       <div className="confirm-actions">
         <button className="btn btn-secondary" onClick={onRetake} disabled={saving}>
           Retake

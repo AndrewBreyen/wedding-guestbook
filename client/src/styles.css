@@ -52,6 +52,10 @@ body {
   box-shadow: 0 2px 8px rgb(43 38 32 / 20%);
 }
 
+.aws-save-test-banner {
+  background: #76521a;
+}
+
 .app-test-mode > .screen {
   padding-top: max(88px, calc(env(safe-area-inset-top) + 54px));
 }
@@ -352,6 +356,30 @@ body {
   padding: 16px;
   color: var(--color-text-soft);
   text-align: center;
+}
+
+.confirm-email-label {
+  display: grid;
+  gap: 6px;
+  width: min(420px, 85vw);
+  color: var(--color-text-soft);
+  font-size: 14px;
+  text-align: left;
+}
+
+.confirm-email-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d9d1c1;
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.confirm-email-hint {
+  font-size: 13px;
 }
 
 .confirm-name {

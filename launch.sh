@@ -3,20 +3,33 @@ set -euo pipefail
 
 KIOSK=0
 TEST_MODE=0
+AWS_SAVE_TEST_MODE=0
 ADMIN_MODE=0
-while getopts "akt" opt; do
+while getopts "akts" opt; do
   case "$opt" in
     a) ADMIN_MODE=1 ;;
     k) KIOSK=1 ;;
     t) TEST_MODE=1 ;;
-    *) echo "Usage: $0 [-a] [-k] [-t]" >&2; exit 2 ;;
+    s) AWS_SAVE_TEST_MODE=1 ;;
+    *) echo "Usage: $0 [-a] [-k] [-t] [-s]" >&2; exit 2 ;;
   esac
 done
+
+if [[ "$TEST_MODE" -eq 1 && "$AWS_SAVE_TEST_MODE" -eq 1 ]]; then
+  echo "Choose either -t (simulated, nothing saved) or -s (save to AWS, no printing)." >&2
+  exit 2
+fi
+if [[ "$ADMIN_MODE" -eq 1 && "$AWS_SAVE_TEST_MODE" -eq 1 ]]; then
+  echo "The admin print tools cannot be used with AWS save test mode." >&2
+  exit 2
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLIENT_DIR="$ROOT_DIR/client"
 CERT_DIR="$CLIENT_DIR/.local-certs"
 URL="https://localhost:5173"
+SERVER_HOST="0.0.0.0"
+LOCAL_HTTPS=1
 VITE_BIN="$CLIENT_DIR/node_modules/.bin/vite"
 
 if [[ ! -x "$VITE_BIN" ]]; then
@@ -24,7 +37,11 @@ if [[ ! -x "$VITE_BIN" ]]; then
   exit 1
 fi
 
-if [[ ! -r "$CERT_DIR/lan.pem" || ! -r "$CERT_DIR/lan-key.pem" ]]; then
+if [[ "$AWS_SAVE_TEST_MODE" -eq 1 ]]; then
+  URL="http://127.0.0.1:5173"
+  SERVER_HOST="127.0.0.1"
+  LOCAL_HTTPS=0
+elif [[ ! -r "$CERT_DIR/lan.pem" || ! -r "$CERT_DIR/lan-key.pem" ]]; then
   echo "Local HTTPS certificates are missing. Run './setup-lan-https.sh' before launching." >&2
   exit 1
 fi
@@ -41,7 +58,9 @@ if [[ "$VITE_PRINT_WIDTH_MM" != "25" && "$VITE_PRINT_WIDTH_MM" != "50" ]]; then
 fi
 export VITE_PRINT_WIDTH_MM
 export VITE_PRINT_TEST_MODE=0
+export VITE_AWS_SAVE_TEST_MODE=0
 export VITE_ADMIN_MODE=0
+export VITE_DIRECT_PRINT=0
 if [[ "$ADMIN_MODE" -eq 1 ]]; then
   export VITE_ADMIN_MODE=1
 fi
@@ -49,15 +68,24 @@ if [[ "$TEST_MODE" -eq 1 ]]; then
   export VITE_PRINT_TEST_MODE=1
   export PRINTER_DRY_RUN=1
   PRINT_MODE="TEST MODE (nothing will be saved or printed)"
+elif [[ "$AWS_SAVE_TEST_MODE" -eq 1 ]]; then
+  export VITE_AWS_SAVE_TEST_MODE=1
+  export VITE_DEMO_MODE=false
+  PRINT_MODE="AWS SAVE TEST MODE (entries are saved; printing is disabled)"
 else
   PRINT_MODE="LIVE NETWORK PRINTING"
 fi
 
-# Set PRINTER_HOST to the VC-500W's IP to print directly with auto cut.
-PRINTER_HOST="${PRINTER_HOST:-192.168.8.228}"
-PRINTER_PORT="${PRINTER_PORT:-9100}"
-PRINTER_MAC="${PRINTER_MAC:-28:7b:11:4d:a3:b4}"
-PRINTER_INTERFACE="${PRINTER_INTERFACE:-en9}"
+if [[ "$AWS_SAVE_TEST_MODE" -eq 1 ]]; then
+  PRINTER_HOST=""
+  PRINTER_PORT=""
+else
+  # Set PRINTER_HOST to the VC-500W's IP to print directly with auto cut.
+  PRINTER_HOST="${PRINTER_HOST:-192.168.8.228}"
+  PRINTER_PORT="${PRINTER_PORT:-9100}"
+  PRINTER_MAC="${PRINTER_MAC:-28:7b:11:4d:a3:b4}"
+  PRINTER_INTERFACE="${PRINTER_INTERFACE:-en9}"
+fi
 if [[ -n "${PRINTER_HOST:-}" ]]; then
   export PRINTER_HOST
   export PRINTER_PORT
@@ -65,7 +93,7 @@ if [[ -n "${PRINTER_HOST:-}" ]]; then
 fi
 
 cd "$CLIENT_DIR"
-LOCAL_HTTPS=1 "$VITE_BIN" --host 0.0.0.0 --port 5173 --strictPort &
+LOCAL_HTTPS="$LOCAL_HTTPS" "$VITE_BIN" --host "$SERVER_HOST" --port 5173 --strictPort &
 SERVER_PID=$!
 
 cleanup() {
@@ -74,20 +102,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for attempt in {1..30}; do
-  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    echo "The Vite server exited before becoming ready." >&2
-    exit 1
-  fi
-  if curl --silent --insecure --fail "$URL" >/dev/null; then
-    break
-  fi
-  if [[ "$attempt" -eq 30 ]]; then
-    echo "The guestbook did not become ready at $URL within 30 seconds." >&2
-    exit 1
-  fi
-  sleep 1
-done
+if [[ "$AWS_SAVE_TEST_MODE" -ne 1 ]]; then
+  for attempt in {1..30}; do
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      echo "The Vite server exited before becoming ready." >&2
+      exit 1
+    fi
+    if curl --silent --insecure --fail "$URL" >/dev/null; then
+      break
+    fi
+    if [[ "$attempt" -eq 30 ]]; then
+      echo "The guestbook did not become ready at $URL within 30 seconds." >&2
+      exit 1
+    fi
+    sleep 1
+  done
+fi
 
 if [[ -n "$PRINTER_HOST" ]]; then
   echo "Direct printing with auto cut enabled -> $PRINTER_HOST"
@@ -96,13 +126,13 @@ echo "----------------------------------------------------------------"
 echo "Starting guestbook on $URL."
 echo "Print configuration: ${VITE_PRINT_WIDTH_MM} mm labels."
 echo "Print mode: ${PRINT_MODE}."
-if [[ "$TEST_MODE" -ne 1 && -n "$PRINTER_HOST" ]]; then
+if [[ "$TEST_MODE" -ne 1 && "$AWS_SAVE_TEST_MODE" -ne 1 && -n "$PRINTER_HOST" ]]; then
   echo "Network printer: $PRINTER_HOST:$PRINTER_PORT"
 fi
 
 # Ping is not a reliable printer health check: some printers ignore ICMP.
 # A TCP connection to the raw-print port verifies the service the app uses.
-if [[ "$TEST_MODE" -ne 1 && -n "$PRINTER_HOST" ]]; then
+if [[ "$TEST_MODE" -ne 1 && "$AWS_SAVE_TEST_MODE" -ne 1 && -n "$PRINTER_HOST" ]]; then
   printer_ready=0
   for attempt in {1..3}; do
     if nc -z -G 3 "$PRINTER_HOST" "$PRINTER_PORT" >/dev/null 2>&1; then
@@ -147,6 +177,7 @@ if [[ "$KIOSK" -eq 1 ]]; then
 else
   echo "Guestbook ready at $URL. Pass -k to open Chrome in kiosk mode."
 fi
+if [[ "$AWS_SAVE_TEST_MODE" -ne 1 ]]; then
 LAN_IPS=()
 LAN_IP_COUNT=0
 for interface in $(ifconfig -l); do
@@ -174,4 +205,5 @@ else
   echo "To connect another device, find this Mac's LAN IP and open https://<LAN-IP>:5173."
 fi
 echo "If a device cannot connect, check that it is on the same network and allow incoming connections through the Mac firewall."
+fi
 wait "$SERVER_PID"

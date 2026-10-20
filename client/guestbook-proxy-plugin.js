@@ -91,7 +91,11 @@ async function saveEntry(apiUrl, body) {
   }
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim() : "";
   if (!name) throw Object.assign(new Error("Name is required."), { statusCode: 400 });
+  if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    throw Object.assign(new Error("Enter a valid email address."), { statusCode: 400 });
+  }
 
   const photo = decodeImage(body.photo, "Photo");
   const printImage = decodeImage(body.printImage, "Print");
@@ -120,7 +124,7 @@ async function saveEntry(apiUrl, body) {
   const response = await fetch(`${apiUrl}/entries`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, name, notes }),
+    body: JSON.stringify({ id, name, notes, email }),
   });
   if (!response.ok) throw new Error("Could not save the guest entry.");
   return response.json();

@@ -2,7 +2,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: AWS backend for the wedding guestbook (GitHub Pages hosts the static client).
 
-Parameters:
 Globals:
   Function:
     Runtime: nodejs24.x

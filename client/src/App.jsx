@@ -12,8 +12,9 @@ import { directPrint } from "./directPrint";
 import { PRINT_HEIGHT_IN } from "./printConfig";
 import demoPortrait from "./assets/demo-portrait-one.png";
 
-const EMPTY_DRAFT = { name: "", notes: "", photoBlob: null, photoAspectRatio: null, isDemo: false };
+const EMPTY_DRAFT = { name: "", notes: "", email: "", photoBlob: null, photoAspectRatio: null, isDemo: false };
 const PRINT_TEST_MODE = import.meta.env.VITE_PRINT_TEST_MODE === "1";
+const AWS_SAVE_TEST_MODE = import.meta.env.VITE_AWS_SAVE_TEST_MODE === "1";
 const ADMIN_MODE = import.meta.env.VITE_ADMIN_MODE === "1";
 
 export default function App() {
@@ -22,6 +23,11 @@ export default function App() {
       {PRINT_TEST_MODE && (
         <div className="test-mode-banner" role="status">
           TEST MODE — Nothing will be saved or printed
+        </div>
+      )}
+      {AWS_SAVE_TEST_MODE && (
+        <div className="test-mode-banner aws-save-test-banner" role="status">
+          AWS SAVE TEST MODE — Entries will be saved; printing is disabled
         </div>
       )}
       <GuestbookApp />
@@ -33,6 +39,7 @@ function GuestbookApp() {
   const [screen, setScreen] = useState("welcome");
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [savedName, setSavedName] = useState("");
+  const [emailLocked, setEmailLocked] = useState(false);
   const [printPreview, setPrintPreview] = useState(null);
   const savedEntry = useRef(null);
   const previewTimer = useRef(null);
@@ -62,16 +69,18 @@ function GuestbookApp() {
   function goHome() {
     setScreen("welcome");
     setDraft(EMPTY_DRAFT);
+    setEmailLocked(false);
     savedEntry.current = null;
   }
 
   function handleTakePhoto({ name, notes, photoBlob, photoAspectRatio }) {
     savedEntry.current = null;
-    setDraft({ name, notes, photoBlob, photoAspectRatio, isDemo: false });
+    setEmailLocked(false);
+    setDraft({ name, notes, email: draft.email, photoBlob, photoAspectRatio, isDemo: false });
     setScreen("confirm");
   }
 
-  async function handleConfirm(printImageBlob) {
+  async function handleConfirm(printImageBlob, email) {
     if (PRINT_TEST_MODE) {
       announceSimulatedPrint(printImageBlob);
       setSavedName(draft.name);
@@ -79,7 +88,7 @@ function GuestbookApp() {
       return;
     }
 
-    if (draft.isDemo) {
+    if (draft.isDemo && !AWS_SAVE_TEST_MODE) {
       try {
         await directPrint(printImageBlob);
       } catch (err) {
@@ -92,8 +101,15 @@ function GuestbookApp() {
 
     let saved = savedEntry.current;
     if (!saved) {
-      saved = await saveEntry({ ...draft, printImageBlob });
+      saved = await saveEntry({ ...draft, email, printImageBlob });
       savedEntry.current = saved;
+      setEmailLocked(true);
+    }
+
+    if (AWS_SAVE_TEST_MODE) {
+      setSavedName(saved.name);
+      setScreen("thanks");
+      return;
     }
 
     try {
@@ -114,6 +130,7 @@ function GuestbookApp() {
       photoBlob,
       photoAspectRatio: null,
       isDemo: true,
+      email: "",
     });
     setScreen("confirm");
   }
@@ -133,7 +150,7 @@ function GuestbookApp() {
   }
 
   return (
-    <div className={`app${PRINT_TEST_MODE ? " app-test-mode" : ""}`}>
+    <div className={`app${PRINT_TEST_MODE || AWS_SAVE_TEST_MODE ? " app-test-mode" : ""}`}>
       {screen === "welcome" && <Welcome onStart={() => setScreen("capture")} onViewAll={() => setScreen("viewAll")} />}
 
       {screen === "capture" && (
@@ -150,6 +167,8 @@ function GuestbookApp() {
       {screen === "confirm" && (
         <Confirm
           draft={draft}
+          emailLocked={emailLocked}
+          onEmailChange={(email) => setDraft((current) => ({ ...current, email }))}
           onRetake={() => setScreen("capture")}
           onConfirm={handleConfirm}
         />

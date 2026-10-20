@@ -129,6 +129,13 @@ Pass `-t` to enable test mode. A persistent banner warns that nothing will be
 saved or printed; guest entries and print jobs are simulated. Combine it with
 other launcher options as needed, for example `./launch.sh -a -k -t`.
 
+Pass `-s` for an AWS save test. Entries and photos are really saved to DynamoDB
+and S3, but printing and startup connectivity checks are disabled. This mode
+uses HTTP on `http://127.0.0.1:5173`, requires no LAN certificate, and is only
+available on the Mac. Internet access is still required when saving each entry.
+Saved test entries count as real guestbook data and may incur AWS charges. Do
+not combine `-s` with `-a` or `-t`.
+
 The launcher defaults to 50 mm labels. Use `VITE_PRINT_WIDTH_MM=25 ./launch.sh`
 for 1-inch stock. At startup, it reports the label width and whether it is
 running live network printing or test mode. After a guest confirms their entry,

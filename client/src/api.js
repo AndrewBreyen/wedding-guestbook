@@ -42,13 +42,14 @@ export async function fetchEntries() {
   return response.json();
 }
 
-export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
+export async function saveEntry({ name, notes, email = "", photoBlob, printImageBlob }) {
   if (DEMO_MODE) {
     const id = createDemoId();
     const entry = {
       id,
       name,
       notes,
+      email: email.trim(),
       photoUrl: URL.createObjectURL(photoBlob),
       printImageUrl: URL.createObjectURL(printImageBlob),
       createdAt: new Date().toISOString(),
@@ -58,7 +59,11 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
   }
 
   const trimmedName = (name || "").trim();
+  const trimmedEmail = (email || "").trim();
   if (!trimmedName) throw new Error("Name is required.");
+  if (trimmedEmail && (trimmedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail))) {
+    throw new Error("Enter a valid email address.");
+  }
   if (!photoBlob) throw new Error("Photo is required.");
   if (!printImageBlob) throw new Error("Print image is required.");
 
@@ -70,6 +75,7 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
         body: JSON.stringify({
           name: trimmedName,
           notes: (notes || "").trim(),
+          email: trimmedEmail,
           photo: await blobToBase64(photoBlob),
           printImage: await blobToBase64(printImageBlob),
         }),
@@ -99,7 +105,7 @@ export async function saveEntry({ name, notes, photoBlob, printImageBlob }) {
     const response = await fetch(`${apiUrl}/entries`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, name: trimmedName, notes: (notes || "").trim() }),
+      body: JSON.stringify({ id, name: trimmedName, notes: (notes || "").trim(), email: trimmedEmail }),
     });
     if (!response.ok) throw new Error("Could not save the guest entry.");
     return response.json();
