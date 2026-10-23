@@ -18,6 +18,26 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
   const effectiveName = name.trim() || "Guest";
 
   useEffect(() => {
+    const viewport = window.visualViewport;
+    const root = document.documentElement;
+    const updateViewportHeight = () => {
+      root.style.setProperty(
+        "--visual-viewport-height",
+        `${viewport?.height ?? window.innerHeight}px`
+      );
+    };
+
+    updateViewportHeight();
+    viewport?.addEventListener("resize", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => {
+      viewport?.removeEventListener("resize", updateViewportHeight);
+      window.removeEventListener("resize", updateViewportHeight);
+      root.style.removeProperty("--visual-viewport-height");
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setLayoutName(null);
     setPhotoLayoutError(null);
@@ -143,14 +163,25 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
 
   return (
     <div className="screen capture-screen">
-      <input
-        className="name-input"
-        placeholder="Your name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={60}
-        autoFocus
-      />
+      <div className="capture-name-field">
+        <label className="capture-name-label" htmlFor="guest-name">First, enter your name</label>
+        <input
+          id="guest-name"
+          className="name-input"
+          placeholder="Type your name here"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={60}
+          autoFocus
+          aria-required="true"
+          aria-describedby={!name.trim() ? "capture-name-hint" : undefined}
+        />
+        {!name.trim() && (
+          <p className="capture-name-hint" id="capture-name-hint">
+            Your name is needed before you can take a picture.
+          </p>
+        )}
+      </div>
       <textarea
         className="notes-input"
         placeholder="Leave a note for the couple (optional)"
@@ -178,9 +209,6 @@ export default function Capture({ draft, onTakePhoto, onCancel, onDemoPrint, onC
         aria-label="Take photo"
       />
       {cameraError && <span className="sr-only">Use “Take or choose a photo” to continue.</span>}
-      {!name.trim() && (
-        <p className="capture-hint">Enter your name first to enable “Choose photo” and take a photo.</p>
-      )}
       {photoLayoutError && <p className="form-error" role="alert">{photoLayoutError}</p>}
 
       <input
